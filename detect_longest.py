@@ -472,8 +472,9 @@ def mainold():
         nf["adsb-loxo [m]"]=nf["dlmax"]
         nf["ortho-adsb [m]"]=nf["domax"]
         nf["duration [s]"]=nf["stop"]-nf["start"]
-        with open(f"{args.folderfigures}/tablelongest.tex",'w') as f:
-            f.write(nf[["identified","segment number","duration [s]","ortho-loxo [m]","adsb-loxo [m]","ortho-adsb [m]"]].to_latex(index=False,float_format="%.2f"))
+        if args.folderfigures is not None:
+            with open(f"{args.folderfigures}/tablelongest.tex",'w') as f:
+                f.write(nf[["identified","segment number","duration [s]","ortho-loxo [m]","adsb-loxo [m]","ortho-adsb [m]"]].to_latex(index=False,float_format="%.2f"))
         nf[["identified","maxloxo","maxortho","segment number","start","stop"]].to_csv("segments_longest.csv",index=False)
     dlatlon = 3
     minlat = flights.latitude.min() - dlatlon

@@ -205,15 +205,14 @@ def douglas_peucker_xy(t,track,xr,yr,params,what):
 class DetectLongestOrthodromyLoxodromy(Detect):
     _old=[]
     default = dict(
-        track_tolerance_degrees = 1.,
+        track_tolerance_degrees = 0.5,
         name_is_orthodromy = "orthodromy",
         name_is_loxodromy = "loxodromy",
         smooth=1e-2,
-        thresh = 0.2,
         thresh_iou=0.1,
-        model="quantile",
-        hit_tolerance=10,
-        thresh_slope = 0.025,
+        model="mean",
+        hit_tolerance=0,
+        thresh_slope = 0.001,
         thresh_border = 0.1,
         timesplit=3600.,
     )
@@ -297,6 +296,7 @@ def mainold():
     # parser.add_argument('-hit_tolerance',type=int,default=10)
     # parser.add_argument('-timesplit',type=float)
     parser.add_argument('-folderfigures',type=str)
+    parser.add_argument('-trajfile',type=str)
     args = parser.parse_args()
     if args.folderfigures is not None:
         SAVEFIG = True
@@ -353,14 +353,17 @@ def mainold():
     icao24='a1f1a0';start=1659854804;stop=1659855207
     # icao24='40660c';start=1659507285;stop=1659509317#1659855207
     # icao24='4caf7e';start=1658907489;stop=1658909950#1659509317#1659855207
-    selecteddate=datetime.fromtimestamp(start).strftime("%Y-%m-%d")
-    flights = filter_trajs.read_trajectories(f"{config.FOLDER}/trajs/{selecteddate}.parquet",queries=[f"icao24=={repr(icao24)}"])#,"callsign=='AAL111'","callsign=='2NAOM'"
-    # flights = filter_trajs.read_trajectories(f"{config.FOLDER}/savan.parquet").query("callsign=='SAVAN07'")
-    print(flights.icao24.unique())
-    # flights["tunix"] = flights["timestamp"].astype(int)//10**9#timestamp()
-    start = start - 1200
-    stop = stop + 1200
-    flights = flights.query("@start<=tunix<=@stop")
+    if args.trajfile is None:
+        selecteddate=datetime.fromtimestamp(start).strftime("%Y-%m-%d")
+        flights = filter_trajs.read_trajectories(f"{config.FOLDER}/trajs/{selecteddate}.parquet",queries=[f"icao24=={repr(icao24)}"])#,"callsign=='AAL111'","callsign=='2NAOM'"
+        # flights = filter_trajs.read_trajectories(f"{config.FOLDER}/savan.parquet").query("callsign=='SAVAN07'")
+        print(flights.icao24.unique())
+        # flights["tunix"] = flights["timestamp"].astype(int)//10**9#timestamp()
+        start = start - 1200
+        stop = stop + 1200
+        flights = flights.query("@start<=tunix<=@stop")
+    else:
+        flights = filter_trajs.read_trajectories(args.trajfile)
     #.query("callsign=='RAM1668'").query("icao24=='02006f'")
     #flights = pd.read_parquet("/disk2/newjson/trajs/2022-08-10.parquet").query("icao24=='c0799a'").query("callsign=='TSC9434'")
     #flights = pd.read_parquet("airacsmall.parquet").query("callsign=='RAM1617'").query("icao24=='02006f'")#.query("icao24=='34364e'")

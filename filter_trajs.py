@@ -13,7 +13,10 @@ def convert(df):
 
 
 def read_trajectories(filein,queries=None):
-    flights = pd.read_parquet(filein)
+    if filein.endswith(".parquet"):
+        flights = pd.read_parquet(filein)
+    else:
+        flights = pd.read_csv(filein)
     if queries is not None:
         for q in queries:
             flights = flights.query(q)

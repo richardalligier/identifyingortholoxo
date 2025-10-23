@@ -13,12 +13,15 @@ def main():
     args = parser.parse_args()
 #    trajs = pd.read_parquet(args.trajsin)
     l = []
-    d = {k:[] for k in ["start","stop","altitude","track_angle","icao24","flight_plan","flight_plan_names"]}
+    d = {k:[] for k in (["start","stop","altitude","track_angle","icao24","flight_plan","flight_plan_names"]+[f"{p}_{s}" for p in ["fixed_threshold","flexible_threshold"] for s in ["short","long"]] )}
     for root, dirs, files in tqdm.tqdm(os.walk(args.jsonfolderin, topdown=False)):
         for name in tqdm.tqdm(files):
             #print(root,dirs,files)
             fname = os.path.join(root, name)
             json = read_json.Situation.from_json(fname)
+            for s in ["short","long"]:
+                d[f"fixed_threshold_{s}"]=(json.deviated.predicted_pairwise.fixed_threshold==s).max()
+                d[f"flexible_threshold_{s}"]=(json.deviated.predicted_pairwise.flexible_threshold==s).max()
             d["start"].append(json.deviated.start)
             d["stop"].append(json.deviated.stop)
             d["flight_plan"].append([(b.longitude,b.latitude) for b in json.deviated.beacons])
@@ -29,10 +32,12 @@ def main():
                 d["altitude"].append(line.altitude)
                 d["track_angle"].append(line.track)
                 d["icao24"].append(line.icao24)
-            # if len(d["start"])>10:
-            #     break
+            #if len(d["start"])>10:
+            #    break
     df=pd.DataFrame(d).sort_values(by=["start"]).reset_index(drop=True)
     df["icao24"] = df["icao24"].astype("string")
+    df["fixed_threshold"]=df[[f"fixed_threshold_{s}" for s in ["short","long"]]].max(axis=1)
+    df["flexible_threshold"]=df[[f"flexible_threshold_{s}" for s in ["short","long"]]].max(axis=1)
     print(df)
     df.to_parquet(args.parquetout)
 

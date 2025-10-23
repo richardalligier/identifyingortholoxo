@@ -2,7 +2,7 @@
 
 include CONFIG
 
-FOLDER_FIGURES=/home/alligier/papiers/opensky2025/figures
+
 
 DOLMAX = 30
 R = 0.5
@@ -63,9 +63,9 @@ $(FOLDER_TRAJS_MAN)/%.parquet: $(FOLDER_TRAJS)/%.parquet
 	python3 filter_trajs.py -flightplans $(FOLDER)/detectedref.parquet -trajsin $^ -trajsout $@ -timesplit $(TIMESPLIT)
 
 figurespdf:
-#	python3 compute_stats.py -folderfigures $(FOLDER_FIGURES) -conflict $(FOLDER)/detectedref.parquet -detectedref $(FOLDER_DETECTEDREF) -detectedother $(FOLDER_DETECTED) -r $(R) -dolmax $(DOLMAX)
 	python3 detect_longest.py -timesplit $(TIMESPLIT) -smooth $(SMOOTH) -thresh_iou $(THRESH_IOU) -track_tolerance_degrees $(TRACK_TOLERANCE_DEGREES_LONGEST) -thresh_slope $(THRESH_SLOPE) -thresh_border $(THRESH_BORDER) -folderfigures $(FOLDER_FIGURES)  -model $(MODEL) -r $(R) -dolmax $(DOLMAX)
-#	python3 plot_catalogue.py -folderfigures $(FOLDER_FIGURES)
+	python3 plot_catalogue.py -folderfigures $(FOLDER_FIGURES)
+	python3 compute_stats.py -folderfigures $(FOLDER_FIGURES) -conflict $(FOLDER)/detectedref.parquet -detectedref $(FOLDER_DETECTEDREF) -detectedother $(FOLDER_DETECTED) -r $(R) -dolmax $(DOLMAX)
 #	python3 detect_classic.py -timesplit $(TIMESPLIT) -smooth $(SMOOTH) -angle_precision $(ANGLE_PRECISION) -min_distance $(MIN_DISTANCE) -thresh_iou $(THRESH_IOU) -flightplans $(FOLDER)/detectedref.parquet -thresh_border $(THRESH_BORDER) -folderfigures $(FOLDER_FIGURES) -model $(MODEL)
 
 

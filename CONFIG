@@ -1,2 +1,3 @@
-FOLDER = /disk2/newjson
-FOLDER_DETECTEDREF_JSON = /disk2/newjson/json/2207
+FOLDER = outfiles
+FOLDER_DETECTEDREF_JSON = smallpartofthecataloguejusttoreproducethefigures/json/2207
+FOLDER_FIGURES= figures

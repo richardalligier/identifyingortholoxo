@@ -27,8 +27,8 @@ def compute_lever(a):
 #     return np.sum(x*err)
 
 
-global iloxortho
-iloxortho = 0
+
+
 
 def thresh_tree(tree,X):
     # print(tree.feature!=0)

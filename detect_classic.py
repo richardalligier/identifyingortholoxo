@@ -11,7 +11,7 @@ import piecewise
 #from traffic.algorithms.prediction.flightplan import Point
 
 DEBUG = False
-SAVEFIG = False
+SAVEFIG = True
 
 def filter_trajectories(df, strategy):
     df = df.copy()

@@ -17,7 +17,8 @@ def read_detected(fname):
     df = pd.read_parquet(fname)
     if "date" not in df:
         df["date"]=df["start"].astype("datetime64[s]").dt.date
-    df["length"]=df["stop"]-df["start"]
+    df["length"]=(df["stop"]-df["start"])
+    df["length_min"]=df["length"]/60
     df["datetime_start"] = df["start"].astype("datetime64[s]")#.dt.date
     df["datetime_stop"] = df["stop"].astype("datetime64[s]")#.dt.date
     return df.sort_values(["icao24","start"])
@@ -94,11 +95,16 @@ def add_intersection(af,cf,suffix=""):
                 res[k].append(qline)
     return res
 
-def plothist(d_ortho,vstr,ystr,bins=50):
+def plothist(d_ortho,vstr,ystr,bins=50,semilog=False):
+    if semilog:
+        bins = np.geomspace(min(v[vstr].min() for v in d_ortho.values()), max(v[vstr].max() for v in d_ortho.values()), bins+1)
     if isinstance(vstr,str):
         plt.hist(tuple(v[vstr] for k,v in d_ortho.items()),bins=bins)
     else:
         plt.hist(tuple(v[vstr[k]] for k,v in d_ortho.items()),bins=bins)
+    if semilog:
+        plt.xscale('log')
+        ystr += " (log scale)"
     plt.xlabel(ystr)
     plt.ylabel(COUNT)
     plt.gca().legend(list(d_ortho.keys()))
@@ -146,10 +152,10 @@ def main():
     add_intersection(d[BASELINE],d[PROJORTHO],suffix=PROJORTHO)
     add_intersection(d[PROJORTHO],d[BASELINE],suffix=BASELINE)
     fig = plt.figure()
-    plothist({k:d[k] for k in [PROJORTHO,BASELINE]},"domax","maximum distance between orthodromy and the trajectory\n on considered segment [m]")
+    plothist({k:d[k] for k in [PROJORTHO,BASELINE]},"domax","maximum distance between orthodromy and the trajectory\n on considered segment [m]",semilog=True)
     savefig(fig,f"{args.folderfigures}/domaxdist.pdf",width=6)
     fig = plt.figure()
-    plothist({k:d[k] for k in [PROJORTHO,BASELINE]},"length","segment duration [s]")
+    plothist({k:d[k] for k in [PROJORTHO,BASELINE]},"length_min","segment duration [min]",semilog=True)
     savefig(fig,f"{args.folderfigures}/lengthdist.pdf",width=6)
     fig = plt.figure()
     f = {

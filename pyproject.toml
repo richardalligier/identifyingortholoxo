@@ -1,0 +1,16 @@
+[project]
+name = "identifyingortholoxo"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "csaps>=1.3.3",
+    "ipykernel>=7.0.1",
+    "mypy>=1.18.2",
+    "pygplates>=1.0.0",
+    "ruff>=0.14.1",
+    "scikit-learn>=1.7.2",
+    "traffic>=2.13",
+    "vl-convert-python>=1.8.0",
+]

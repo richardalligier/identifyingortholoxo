@@ -182,25 +182,6 @@ def douglas_peucker_xy(t,track,xr,yr,params,what):
     assert(upper.max()<n)
     # print(thresholds)
     return [s.totuple() for s in lowerupper]
-    # indexes = set()
-    # for iseg,(i,j) in enumerate(zip(lower,upper)):
-    #     if i+1<j:
-    #         for k,l in reducetrack(t[i:j+1],track[i:j+1],thresh=params["thresh"]):
-    #             indexes.add((i+k,i+l))
-    # return [(iseg,dict(),i,j,angle[i:j+1]) for iseg,(i,j) in enumerate(indexes)]
-
-
-
-# def douglas_peucker_proj(crs_dest,t,track,lats,lons,criterias,params):
-#     n =lats.shape[0]
-#     clat = lats[n//2]
-#     clon = lons[n//2]
-#     crs_geo = CRS.from_epsg(4326)
-#     transformer = Transformer.from_crs(crs_geo, crs_dest, always_xy=True)
-#     x,y = transformer.transform(lons,lats)
-#     indexes = douglas_peucker_xy(t,track,x,y,criterias,params)
-#     s = [build(lats,lons,iseg,cstep,i,j,a) for iseg,cstep,i,j,a in indexes]
-#     return s
 
 class DetectLongestOrthodromyLoxodromy(Detect):
     _old=[]
@@ -249,21 +230,6 @@ class DetectLongestOrthodromyLoxodromy(Detect):
         for k,crs in dcrs.items():
             ds[k]=self.extract_segments_xy(crs,df,k)#,self.criterias,self.params)
         return ds
-
-
-def add_parser(parser):
-    for k,v in DetectLongestOrthodromyLoxodromy.default.items():
-        if isinstance(v,float):
-            parser.add_argument(f'-{k}',type=float,default=v)
-        elif isinstance(v,int):
-            parser.add_argument(f'-{k}',type=int,default=v)
-        else:
-            parser.add_argument(f'-{k}',type=str,default=v)
-
-def extract_args(args):
-    d=vars(args)
-    kwargs={k:d[k] for k in DetectLongestOrthodromyLoxodromy.default}
-    return kwargs
 
 def mainold():
 
@@ -386,6 +352,7 @@ def mainold():
     print(flights.groupby(by=groupby).count())
     kwargs = extract_args(args)
     res = flights.groupby(by=groupby).apply(DetectLongestOrthodromyLoxodromy(**kwargs).apply,include_groups=True).reset_index(drop=True)
+    res.to_csv("newfigures/longest.csv")
     print(list(res))
     res["dangle"] = res["maxangle"]-res["minangle"]
     #res = flights.filter(DetectOrthodromyLoxodromy()).data
@@ -464,9 +431,10 @@ def mainold():
         dfl["other"] = dfl["domax"]
         dfo["other"] = dfo["dlmax"]
         nf = pd.concat([dfl,dfo],ignore_index=True)
+        nf["pure"]= (nf.dolmax>args.dolmax) & (nf.me <nf.other * args.r) & (nf.me < nf.other * args.r)
         nf["maxloxo"]=dfl["segment number"].max()
         nf["maxortho"]=dfo["segment number"].max()
-        nf = nf.query("dolmax>@args.dolmax").query("me<dolmax*@args.r").query("me<other*@args.r")
+#        nf = nf.query("dolmax>@args.dolmax").query("me<dolmax*@args.r").query("me<other*@args.r")
         nf["identified"] = nf["iswhat"]
         nf["ortho-loxo [m]"]=nf["dolmax"]
         nf["adsb-loxo [m]"]=nf["dlmax"]
@@ -474,8 +442,8 @@ def mainold():
         nf["duration [s]"]=nf["stop"]-nf["start"]
         if args.folderfigures is not None:
             with open(f"{args.folderfigures}/tablelongest.tex",'w') as f:
-                f.write(nf[["identified","segment number","duration [s]","ortho-loxo [m]","adsb-loxo [m]","ortho-adsb [m]"]].to_latex(index=False,float_format="%.2f"))
-        nf[["identified","maxloxo","maxortho","segment number","start","stop"]].to_csv("segments_longest.csv",index=False)
+                f.write(nf[["identified","pure","segment number","duration [s]","ortho-loxo [m]","adsb-loxo [m]","ortho-adsb [m]"]].to_latex(index=False,float_format="%.2f"))
+        nf[["identified","pure","maxloxo","maxortho","segment number","start","stop"]].to_csv("segments_longest.csv",index=False)
     dlatlon = 3
     minlat = flights.latitude.min() - dlatlon
     maxlat = flights.latitude.max() + dlatlon
@@ -483,78 +451,6 @@ def mainold():
     maxlon = flights.longitude.max() + dlatlon
     def isok(nav):
         return nav.type == "DME" and minlon<=nav.longitude <=maxlon and minlat<=nav.latitude <=maxlat
-    # lon = [nav.longitude for nav in navaids if isok(nav)]
-    # lat = [nav.latitude for nav in navaids if isok(nav)]
-    # plt.scatter(lon,lat,c="red")
-    # plt.show()
-#         if nsegs>0:
-#             plt.scatter(df.longitude,df.latitude)
-#             for i in range(1,nsegs+1):
-#                 dfi = df.query(f"{what}==@i")
-#                 print(f"{dfi.shape=}")
-#                 assert(dfi.latitude.values[0]==dfi.latitude.values[0])
-#                 assert(dfi.latitude.values[-1]==dfi.latitude.values[-1])
-#                 o = orthodromy(dfi.latitude.values[0],dfi.longitude.values[0],dfi.latitude.values[-1],dfi.longitude.values[-1],dfi.shape[0])
-#                 print(f"{o.shape=}")
-# #                plt.scatter(dfi.longitude,dfi.latitude)
-#                 plt.scatter(o[:,1],o[:,0])
-#             plt.gca().axis('equal')
-#             plt.show()
-#             proj = pyproj.Proj(proj="merc",ellps='sphere')
-#             # lon=0
-#             # for lat in range(0,40):
-#             #     print(f"{proj.transform(lon,lat)[1]=} {mercator(lat,lon)[0]=} {proj.transform(lon,lat)[1]/mercator(lat,lon)[0]=}")
-#             # lat = 0
-#             # for lon in range(0,40):
-#             #     print(f"{proj.transform(lon,lat)[0]=} {mercator(lat,lon)[1]=} {proj.transform(lon,lat)[0]/mercator(lat,lon)[1]=}")
-#             # raise Exception
-#             plt.plot(df.timestamp.values,df.track.values)
-#             for i in range(1,nsegs+1):
-#                 dfi = df.query(f"{what}==@i")
-#                 if what == "is_orthodromy":
-#                     o = orthodromy(dfi.latitude.values[0],dfi.longitude.values[0],dfi.latitude.values[-1],dfi.longitude.values[-1],dfi.shape[0])
-#                     otrack, _, _ = geod.inv(o[:-1,1],o[:-1,0],o[1:,1],o[1:,0])
-#                 else:
-#                     proj = pyproj.Proj(proj="merc",ellps='sphere')
-#                     y1,x1=np.array(proj.transform(dfi.latitude.values[0],dfi.longitude.values[0]))
-#                     y2,x2=np.array(proj.transform(dfi.latitude.values[-1],dfi.longitude.values[-1]))
-#                     dx = x2-x1
-#                     dy = y2-y1
-#                     #https://en.wikipedia.org/wiki/Rhumb_line
-#                     m = dy/dx
-#                     lambda0 = dfi.latitude.values[0]-y1/m
-#                     lambda02 = dfi.latitude.values[-1]-y2/m
-#                     print(f"{lambda02=} {lambda0=}")
-#                     m = np.arctan2(dx,dy)
-#                     print(f"{(dfi.latitude.values[0],dfi.longitude.values[0])=} {x1=} {y1=} {(dfi.latitude.values[-1],dfi.longitude.values[-1])=} {x2=} {y2=} {dx=} {dy=}")
-#                     y1,x1=mercator(dfi.latitude.values[0],dfi.longitude.values[0])
-#                     y2,x2=mercator(dfi.latitude.values[-1],dfi.longitude.values[-1])
-#                     dx = x2-x1
-#                     dy = y2-y1
-#                     m = np.arctan2(dx,dy)
-#                     print(f"{(dfi.latitude.values[0],dfi.longitude.values[0])=} {x1=} {y1=} {(dfi.latitude.values[-1],dfi.longitude.values[-1])=} {x2=} {y2=} {dx=} {dy=}")
-#                     otrack = np.full(dfi.shape[0]-1,np.degrees(m))
-#                 print(dfi.timestamp.values[0],dfi.timestamp.values[-1])
-#                 # plt.plot(dfi.timestamp.values[:-1],zeroto360(otrack))
-#                 plt.plot(dfi.timestamp.values[:-1],zeroto360(otrack))
-#             plt.show()
-#         else:
-#             print("no loxo")
-    #plt.plot(d2*100000)
-#import matplotlib
-#matplotlib.use('nbagg')
-#%pylab inline
-#mpld3.enable_notebook()
-#print(df.shape[0],(df.timestamp.max()-df.timestamp.min()).total_seconds())
-#%matplotlib widget
+
 if __name__ == '__main__':
     mainold()
-#[x for x in s if min(x.dl.max(),x.do.max())<25000 and x.interval[1]-x.interval[0]>100]
-#for line in s:
-    #plt.scatter()
-
-#print(distance(posl[:,0],posl[:,1],poso[:,0],poso[:,1]))
-
-
-#p1,p2
-#proj.transform(p1[0],p1[1],direction=pyproj.enums.TransformDirection.INVERSE),(lat1,lon1)

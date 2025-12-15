@@ -1,7 +1,7 @@
 import pandas as pd
 
 import argparse
-from detect_classic import extract_flightplan, NoFlightPlan, DetectOrthodromyWithBeacons
+from detect_classic import FlightPlanDatabase, NoFlightPlan, Detect
 from detect_orthodromy import filter_trajectories
 
 def convert(df):
@@ -67,17 +67,18 @@ def main():
     args = parser.parse_args()
     flights = read_trajectories(args.trajsin)
     flightplans = pd.read_parquet(args.flightplans)
-    detector = DetectOrthodromyWithBeacons(flightplans=flightplans,timesplit=args.timesplit)
+    basedetector = Detect()#OrthodromyWithBeacons(flightplans=flightplans,timesplit=args.timesplit)
+    fpdatabase = FlightPlanDatabase(args.flightplans)
     def keep_with_fp(df):
         try:
-            extract_flightplan(flightplans,df)
+            fpdatabase.extract_flightplan(df)
             return df
         except NoFlightPlan:
             return pd.DataFrame()
     groupby = ["icao24","callsign","date"]
     def split_and_keep(df):
         return df.groupby(by=groupby).apply(keep_with_fp,include_groups=True).reset_index(drop=True)#.drop(columns="index")
-    flights = detector.apply_splitted(flights,split_and_keep)
+    flights = basedetector.apply_splitted(flights,split_and_keep,args.timesplit)
     print(list(flights))
     if not flights.empty:
         flights = flights.reset_index(drop=True).sort_values(by=groupby).drop(columns=["index","splitted","date","tunix"])

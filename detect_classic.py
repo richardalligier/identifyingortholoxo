@@ -225,17 +225,12 @@ def detect(tf,flightplan,params):
     global old
     l=list(tf)
     assert(len(l)==1)
-    # print(flightplan)
-    # print(l[0].closest_point(flightplan))
-    # raise Exception
     aligned = l[0].aligned_on_navpoint(
         flightplan,
         angle_precision=params["angle_precision"],
         min_distance=params["min_distance"],
         time_precision=params["time_precision"],
     )
-    # print(tf.data)
-    # print(list(tf.data))
     res = []
     for iseg,f in enumerate(aligned):
         debugdata = {k: f.data[k].max() for k in  ['distance', 'bearing', 'shift', 'delta', ]}
@@ -243,9 +238,7 @@ def detect(tf,flightplan,params):
         p = get_navaid(flightplan,debugdata['navaid'])
         debugdata['navaid_latitude']=p.latitude
         debugdata['navaid_longitude']=p.longitude
-        # print(f.data)
         res.append(Segment(iseg,debugdata,f.data.index[0],f.data.index[-1]))
-    # res = groupbyintersection(res,params["thresh_iou"])
     newres = []
     t = tf.data["tunix"].values
     track = tf.data["track"].values
@@ -269,77 +262,56 @@ def compute_angle(t,xr,yr,params):
         print(((pxy[0]-xr)**2+(pxy[1]-yr)**2).mean())
         print(np.sqrt(((pxy[0]-xr)**2+(pxy[1]-yr)**2).max()))
     dx,dy = sxy(t,nu=1)
-    # print(xr)
-    # print(yr)
-    # plt.scatter(xr,yr)
-    # plt.scatter(*pxy,s=1)
-    # plt.show()
     angle = np.degrees((np.arctan2(dy,dx)))
     return angle
 
 
-
-# def extractor(flightplan,df,params):
-#     tf = Traffic(df)
-#     return detect(tf,flightplan,params)
-
-
-
-# class Point(mixins.PointMixin):
-#     def __init__(self,name,latitude,longitude):
-#         self.longitude = longitude
-#         self.latitude = latitude
-#         self.name = name
-#     def __repr__(self):
-#         return f"({self.longitude}, {self.latitude})"
 class NoFlightPlan(Exception): pass
 
-old = None
-def extract_flightplan(flightplans,df):
-    global old
-    icao24 = df.icao24.values[0]
-    # print(type(icao24))
-    # print(df.dtypes)
-    # print(flightplans.dtypes)
-    # print(icao24)
-    # print(list(df))
-    # print(list(df))
-    # print(list(flightplans))
-    # print(flightplans.icao24.unique())
-    fp = flightplans.query("icao24==@icao24").query("@df.tunix.min()<=start").query("stop<=@df.tunix.max()")
-    res = []
-    if fp.shape[0]>0:
-        for _,line in fp.iterrows():
-            res.append([mixins.PointBase(name=name,latitude=x[1],longitude=x[0],altitude=float("nan")) for x,name in zip(line["flight_plan"],line["flight_plan_names"])])
-    # print(f"{len(res)=} {df.icao24.iloc[0]=} {df.date.iloc[0]=} {df.callsign.iloc[0]=} {df.shape=}")
-    # if old is not None:
-    #     isnotok = df.icao24.iloc[0]==old[0] and df.date.iloc[0]==old[1] and df.callsign.iloc[0]==old[2]
-    #     print(f"{df.icao24.iloc[0]==old[0]} {df.date.iloc[0]==old[1]} {df.callsign.iloc[0]==old[2]}")
-    if len(res)==1:
-        # print(df.shape,df.icao24.unique(),df.callsign.unique(),"ok")
-        return res[0]
-    # print(df.shape)
-    # print(list(df.icao24.unique()))
-    # print(list(df.callsign.unique()))
-    # print(f"{len(res)=}")
-    if len(res)>1:
-        names = [p.name for p in res[0]]
-        for x in range(1,len(res)):
-            if [p.name for p in res[x]] != names:
-                print(res)
-                raise NoFlightPlan
-        return res[0]
-    raise NoFlightPlan
+class FlightPlanDatabase:
+    def __init__(self,filename):
+        self.flightplans = pd.read_parquet(filename)
+    def extract_flightplan(self,df):
+        icao24 = df.icao24.values[0]
+        fp = self.flightplans.query("icao24==@icao24").query("@df.tunix.min()<=start").query("stop<=@df.tunix.max()")
+        res = []
+        if fp.shape[0]>0:
+            for _,line in fp.iterrows():
+                res.append([mixins.PointBase(name=name,latitude=x[1],longitude=x[0],altitude=float("nan")) for x,name in zip(line["flight_plan"],line["flight_plan_names"])])
+        if len(res)==1:
+            return res[0]
+        if len(res)>1:
+            names = [p.name for p in res[0]]
+            for x in range(1,len(res)):
+                if [p.name for p in res[x]] != names:
+                    print(res)
+                    raise NoFlightPlan
+            return res[0]
+        raise NoFlightPlan
 
 
 class Detect:
     _constantv = ["icao24","callsign","date"]
     _integersv = ["start","stop","npts"]
     _all = ["iswhat","dolmax","domax","dlmax","domean","dlmean","v","maxangle","minangle","stdangle","meanabsangleerror","lever"]+_integersv+_constantv+[f"{v}_{s}" for v in ["altitude","track"] for s in ["start","stop"]]
+    @classmethod
+    def add_parser(cls,parser):
+        for k,v in cls.default.items():
+            if isinstance(v,float):
+                parser.add_argument(f'-{k}',type=float,default=v)
+            elif isinstance(v,int):
+                parser.add_argument(f'-{k}',type=int,default=v)
+            else:
+                parser.add_argument(f'-{k}',type=str,default=v)
+    @classmethod
+    def extract_args(cls,args):
+        d={k:v for k,v in vars(args).items()}
+        kwargs={k:d[k] for k in cls.default}
+        return kwargs
     def apply(self, df):
-        return self.apply_splitted(df,lambda x: self._apply(x).astype({k:np.int64 for k in self._integersv}))
-    def apply_splitted(self,df,f):
-        isok = (df["timestamp"].diff().dt.total_seconds().to_numpy()>self.params["timesplit"])
+        return self.apply_splitted(df,lambda x: self._apply(x).astype({k:np.int64 for k in self._integersv}),self.params["timesplit"])
+    def apply_splitted(self,df,f,timesplit):
+        isok = (df["timestamp"].diff().dt.total_seconds().to_numpy()>timesplit)
         df["splitted"]= isok.cumsum()
         res=df.groupby(by="splitted").apply(f)
         return res
@@ -349,14 +321,6 @@ class Detect:
         i,j = r.interval
         res = i+1<j and latsin[i]!=latsin[j] and lonsin[i]!=lonsin[j]
         return res
-    # def process(self,s,iswhat):
-    #         for r in s:
-    #             i,j = r.interval
-    #             if self.isvalid(r,latsin,lonsin,indexes):#i+1<j and latsin[i]!=latsin[j] and lonsin[i]!=lonsin[j]:
-    #                 assert(latsin[i]==lats[indexes[i]])
-    #                 assert(lonsin[i]==lons[indexes[i]])
-    #                 assert(latsin[j]==lats[indexes[j]])
-    #                 assert(lonsin[j]==lons[indexes[j]])
     def _apply(self, df):
         # print("in Dectect._apply")
         df = df.reset_index(drop=True)
@@ -435,14 +399,22 @@ class DetectOrthodromyWithBeacons(Detect):
         thresh_iou = 0.9,
         thresh_border = 0.1,
     )
-    def __init__(self,extract_flightplan,flightplans, **kwargs):
+    @classmethod
+    def add_parser(cls,parser):
+        parser.add_argument('-flightplans',type=str,required=True)
+        super().add_parser(parser)
+    @classmethod
+    def extract_args(cls,args):
+        kwargs = super().extract_args(args)
+        kwargs['fpdatabase']=FlightPlanDatabase(args.flightplans)
+        return kwargs
+    def __init__(self,fpdatabase, **kwargs):
         super().__init__()
-        self.flightplans = flightplans
         self.params = {**self.default, **kwargs}
         self.params["thresh_slope"]=None
-        self.extract_flightplan = extract_flightplan
+        self.fpdatabase=fpdatabase
     def extract_segments(self,df):
-        flightplan = self.extract_flightplan(self.flightplans,df)
+        flightplan = self.fpdatabase.extract_flightplan(df)#self.extract_flightplan(self.flightplans,df)
         if flightplan == []:
             return {}
         t = (df.timestamp.astype(int)//10**9).values
@@ -464,23 +436,10 @@ class DetectOrthodromyWithBeacons(Detect):
         # print(s)
         return s
 
-def add_parser(parser):
-    parser.add_argument('-flightplans',type=str,required=True)
-    for k,v in DetectOrthodromyWithBeacons.default.items():
-        if isinstance(v,float):
-            parser.add_argument(f'-{k}',type=float,default=v)
-        elif isinstance(v,int):
-            parser.add_argument(f'-{k}',type=int,default=v)
-        else:
-            parser.add_argument(f'-{k}',type=str,default=v)
 
 
-def extract_args(args,extract_flightplan):
-    d={k:v for k,v in vars(args).items()}
-    kwargs={k:d[k] for k in DetectOrthodromyWithBeacons.default}
-    kwargs["flightplans"] = pd.read_parquet(args.flightplans)
-    kwargs["extract_flightplan"]=extract_flightplan
-    return kwargs
+
+
 
 def mainold():
     import matplotlib.pyplot as plt
@@ -498,16 +457,10 @@ def mainold():
     parser = argparse.ArgumentParser(
         description='fit trajectories and save them in folders',
     )
-    add_parser(parser)
-        # parser.add_argument('-angle_precision',type=float,default=1.)
-        # parser.add_argument('-thresh_border',type=float,default=0.1)
-        # parser.add_argument('-thresh_iou',type=float,default=0.1)
-        # parser.add_argument('-model',default="quantile")
-        # parser.add_argument('-min_distance',type=float)
-        # parser.add_argument('-timesplit',type=float)
+    DetectOrthodromyWithBeacons.add_parser(parser)
+    
     parser.add_argument('-folderfigures',type=str)
     # parser.add_argument('-lever_crit',type=float,default=5)
-    args = parser.parse_args()
     args = parser.parse_args()
     SAVEFIG=False
     if args.folderfigures is not None:
@@ -557,10 +510,12 @@ def mainold():
     print(flights.groupby(by=groupby).count())
     # kwargs = {k:v for k,v in vars(args).items()}
     # del kwargs["folderfigures"]
-    kwargs=extract_args(args,extract_flightplan)#["flightplans"] = pd.read_parquet(args.flightplans)
-    detector = DetectOrthodromyWithBeacons(**kwargs)
+    kwargs=DetectOrthodromyWithBeacons.extract_args(args)#["flightplans"] = pd.read_parquet(args.flightplans)
+    fpdatabase = FlightPlanDatabase(args.flightplans)
+    detector = DetectOrthodromyWithBeacons(fpdatabase,**kwargs)
 #    res = flights.groupby(by=groupby).apply(DetectOrthodromyWithBeacons(extract_flightplan=extract_flightplan,thresh_border=args.thresh_border,flightplans=flightplans,smooth=args.smooth,angle_precision=args.angle_precision,thresh=args.thresh,thresh_iou=args.thresh_iou,timesplit=args.timesplit,min_distance=args.min_distance).apply,include_groups=True).reset_index(drop=True)
     res = flights.groupby(by=groupby).apply(detector.apply,include_groups=True).reset_index(drop=True)
+    res.to_csv("newfigures/classic.csv")
     print(list(res))
     res["dangle"] = res["maxangle"]-res["minangle"]
 
@@ -647,69 +602,6 @@ def mainold():
     maxlon = flights.longitude.max() + dlatlon
     def isok(nav):
         return nav.type == "DME" and minlon<=nav.longitude <=maxlon and minlat<=nav.latitude <=maxlat
-    # lon = [nav.longitude for nav in navaids if isok(nav)]
-    # lat = [nav.latitude for nav in navaids if isok(nav)]
-    # plt.scatter(lon,lat,c="red")
-    # plt.show()
-#         if nsegs>0:
-#             plt.scatter(df.longitude,df.latitude)
-#             for i in range(1,nsegs+1):
-#                 dfi = df.query(f"{what}==@i")
-#                 print(f"{dfi.shape=}")
-#                 assert(dfi.latitude.values[0]==dfi.latitude.values[0])
-#                 assert(dfi.latitude.values[-1]==dfi.latitude.values[-1])
-#                 o = orthodromy(dfi.latitude.values[0],dfi.longitude.values[0],dfi.latitude.values[-1],dfi.longitude.values[-1],dfi.shape[0])
-#                 print(f"{o.shape=}")
-# #                plt.scatter(dfi.longitude,dfi.latitude)
-#                 plt.scatter(o[:,1],o[:,0])
-#             plt.gca().axis('equal')
-#             plt.show()
-#             proj = pyproj.Proj(proj="merc",ellps='sphere')
-#             # lon=0
-#             # for lat in range(0,40):
-#             #     print(f"{proj.transform(lon,lat)[1]=} {mercator(lat,lon)[0]=} {proj.transform(lon,lat)[1]/mercator(lat,lon)[0]=}")
-#             # lat = 0
-#             # for lon in range(0,40):
-#             #     print(f"{proj.transform(lon,lat)[0]=} {mercator(lat,lon)[1]=} {proj.transform(lon,lat)[0]/mercator(lat,lon)[1]=}")
-#             # raise Exception
-#             plt.plot(df.timestamp.values,df.track.values)
-#             for i in range(1,nsegs+1):
-#                 dfi = df.query(f"{what}==@i")
-#                 if what == "is_orthodromy":
-#                     o = orthodromy(dfi.latitude.values[0],dfi.longitude.values[0],dfi.latitude.values[-1],dfi.longitude.values[-1],dfi.shape[0])
-#                     otrack, _, _ = geod.inv(o[:-1,1],o[:-1,0],o[1:,1],o[1:,0])
-#                 else:
-#                     proj = pyproj.Proj(proj="merc",ellps='sphere')
-#                     y1,x1=np.array(proj.transform(dfi.latitude.values[0],dfi.longitude.values[0]))
-#                     y2,x2=np.array(proj.transform(dfi.latitude.values[-1],dfi.longitude.values[-1]))
-#                     dx = x2-x1
-#                     dy = y2-y1
-#                     #https://en.wikipedia.org/wiki/Rhumb_line
-#                     m = dy/dx
-#                     lambda0 = dfi.latitude.values[0]-y1/m
-#                     lambda02 = dfi.latitude.values[-1]-y2/m
-#                     print(f"{lambda02=} {lambda0=}")
-#                     m = np.arctan2(dx,dy)
-#                     print(f"{(dfi.latitude.values[0],dfi.longitude.values[0])=} {x1=} {y1=} {(dfi.latitude.values[-1],dfi.longitude.values[-1])=} {x2=} {y2=} {dx=} {dy=}")
-#                     y1,x1=mercator(dfi.latitude.values[0],dfi.longitude.values[0])
-#                     y2,x2=mercator(dfi.latitude.values[-1],dfi.longitude.values[-1])
-#                     dx = x2-x1
-#                     dy = y2-y1
-#                     m = np.arctan2(dx,dy)
-#                     print(f"{(dfi.latitude.values[0],dfi.longitude.values[0])=} {x1=} {y1=} {(dfi.latitude.values[-1],dfi.longitude.values[-1])=} {x2=} {y2=} {dx=} {dy=}")
-#                     otrack = np.full(dfi.shape[0]-1,np.degrees(m))
-#                 print(dfi.timestamp.values[0],dfi.timestamp.values[-1])
-#                 # plt.plot(dfi.timestamp.values[:-1],zeroto360(otrack))
-#                 plt.plot(dfi.timestamp.values[:-1],zeroto360(otrack))
-#             plt.show()
-#         else:
-#             print("no loxo")
-    #plt.plot(d2*100000)
-#import matplotlib
-#matplotlib.use('nbagg')
-#%pylab inline
-#mpld3.enable_notebook()
-#print(df.shape[0],(df.timestamp.max()-df.timestamp.min()).total_seconds())
-#%matplotlib widget
+
 if __name__ == '__main__':
     mainold()

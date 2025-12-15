@@ -301,7 +301,7 @@ chart
 chart = alt.vconcat(
     alt.layer(
         base := alt.Chart(
-            df[["type", "iouSegmentsProjOrtho", "iouSegmentsBaseline", "length"]]
+            df[["type", "iouSegmentsProjOrtho", "iouSegmentsBaseline", "length"]]#.query("length>300")
         )
         .mark_bar(opacity=0.3)
         .encode(
@@ -322,7 +322,7 @@ chart = alt.vconcat(
         ),
         base.encode(alt.X("iouSegmentsBaseline:Q").bin(maxbins=30))
         .transform_filter(alt.datum.length > 300)
-        .mark_bar(opacity=1),
+        .mark_bar(opacity=0.3),
     ),
 ).configure_axis(
     labelFontSize=15,

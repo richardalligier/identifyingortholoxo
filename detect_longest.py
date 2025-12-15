@@ -330,13 +330,6 @@ def mainold():
         flights = flights.query("@start<=tunix<=@stop")
     else:
         flights = filter_trajs.read_trajectories(args.trajfile)
-    #.query("callsign=='RAM1668'").query("icao24=='02006f'")
-    #flights = pd.read_parquet("/disk2/newjson/trajs/2022-08-10.parquet").query("icao24=='c0799a'").query("callsign=='TSC9434'")
-    #flights = pd.read_parquet("airacsmall.parquet").query("callsign=='RAM1617'").query("icao24=='02006f'")#.query("icao24=='34364e'")
-    #flights = flights.query("icao24 == @flights.icao24.unique()[2]")
-    # flights.to_parquet("ech.parquet")
-    # raise Exception
-    # flights["date"] = flights["timestamp"].dt.date
     print(flights["date"])
     # flights = flights.query("icao24=='4cc0df'").query("callsign=='BCS142'").query("date=='2022-07-14'").reset_index()
     # flights.to_parquet("pb.parquet")
@@ -453,4 +446,4 @@ def mainold():
         return nav.type == "DME" and minlon<=nav.longitude <=maxlon and minlat<=nav.latitude <=maxlat
 
 if __name__ == '__main__':
-    mainold()
+    detect_classic.test_one(DetectLongestOrthodromyLoxodromy,"longest")

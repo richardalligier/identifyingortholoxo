@@ -441,7 +441,7 @@ class DetectOrthodromyWithBeacons(Detect):
 
 
 
-def mainold():
+def test_one(cls,prefix):
     import matplotlib.pyplot as plt
     import matplotlib.dates as mdates
     from traffic.data import opensky, navaids
@@ -457,7 +457,7 @@ def mainold():
     parser = argparse.ArgumentParser(
         description='fit trajectories and save them in folders',
     )
-    DetectOrthodromyWithBeacons.add_parser(parser)
+    cls.add_parser(parser)
     
     parser.add_argument('-folderfigures',type=str)
     # parser.add_argument('-lever_crit',type=float,default=5)
@@ -510,12 +510,11 @@ def mainold():
     print(flights.groupby(by=groupby).count())
     # kwargs = {k:v for k,v in vars(args).items()}
     # del kwargs["folderfigures"]
-    kwargs=DetectOrthodromyWithBeacons.extract_args(args)#["flightplans"] = pd.read_parquet(args.flightplans)
-    fpdatabase = FlightPlanDatabase(args.flightplans)
-    detector = DetectOrthodromyWithBeacons(fpdatabase,**kwargs)
+    kwargs=cls.extract_args(args)#["flightplans"] = pd.read_parquet(args.flightplans)
+    detector = cls(**kwargs)
 #    res = flights.groupby(by=groupby).apply(DetectOrthodromyWithBeacons(extract_flightplan=extract_flightplan,thresh_border=args.thresh_border,flightplans=flightplans,smooth=args.smooth,angle_precision=args.angle_precision,thresh=args.thresh,thresh_iou=args.thresh_iou,timesplit=args.timesplit,min_distance=args.min_distance).apply,include_groups=True).reset_index(drop=True)
     res = flights.groupby(by=groupby).apply(detector.apply,include_groups=True).reset_index(drop=True)
-    res.to_csv("newfigures/classic.csv")
+    res.to_csv(f"{args.folderfigures}/{prefix}.csv")
     print(list(res))
     res["dangle"] = res["maxangle"]-res["minangle"]
 
@@ -554,7 +553,7 @@ def mainold():
         if SAVEFIG:
             fig.set_tight_layout({'pad':0})
             fig.set_figwidth(4)
-            plt.savefig("figures/latlon.pdf", dpi=300, bbox_inches='tight')
+            plt.savefig(f"{args.folderfigures}/{prefix}latlon.pdf", dpi=300, bbox_inches='tight')
             plt.clf()
         else:
             plt.show()
@@ -583,7 +582,7 @@ def mainold():
         if SAVEFIG:
             fig.set_tight_layout({'pad':0})
             fig.set_figwidth(4)
-            plt.savefig("figures/timetrack.pdf", dpi=300, bbox_inches='tight')
+            plt.savefig(f"{args.folderfigures}/{prefix}timetrack.pdf", dpi=300, bbox_inches='tight')
             # plt.clf()
         else:
             plt.show()
@@ -604,4 +603,4 @@ def mainold():
         return nav.type == "DME" and minlon<=nav.longitude <=maxlon and minlat<=nav.latitude <=maxlat
 
 if __name__ == '__main__':
-    mainold()
+    test_one(DetectOrthodromyWithBeacons,"classic")

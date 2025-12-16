@@ -133,7 +133,7 @@ def filterbylever(seg,angle,params):
     a = angle[i:j+1]
     return piecewise.compute_lever(a)<params["thresh_lever"]
 
-def douglas_peucker_xy(t,track,xr,yr,params,what):
+def isolate_longest_constant_heading(t,track,xr,yr,params,what):
     n = xr.shape[0]
 
     angle = np.unwrap(compute_angle(t,xr,yr,params),period=360)#np.degrees(np.unwrap(np.arctan2(dy,dx)))
@@ -165,11 +165,6 @@ def douglas_peucker_xy(t,track,xr,yr,params,what):
         del lower
         del upper
 
-    # lowerupper = [Segment(iseg,dict(),i,j) for iseg,(i,j) in enumerate(lowerupper)]
-    # lowerupper = [Segment(iseg,dict(),i,j) for iseg,(i,j) in enumerate(lowerupper)]
-    # print(f"before {len(lowerupper)=}")
-    # lowerupper = groupbyintersection(lowerupper,angle,params["thresh_iou"])
-    # lowerupper = [seg for seg in lowerupper if filterbylever(seg,angle,params)]
     lowerupper = sortbysizeandfilterbyintersection(lowerupper,angle,params["thresh_iou"])
     # print(f"after  {len(lowerupper)=}")
     if lowerupper == []:
@@ -211,7 +206,7 @@ class DetectLongestOrthodromyLoxodromy(Detect):
         transformer = Transformer.from_crs(crs_geo, crs_dest, always_xy=True)
         x,y = transformer.transform(lons,lats)
         angle = np.unwrap(compute_angle(t,x,y,self.params),period=360)
-        segments = douglas_peucker_xy(t,track,x,y,self.params,what)
+        segments = isolate_longest_constant_heading(t,track,x,y,self.params,what)
         s = [build(lats,lons,iseg,cstep,i,j,angle[i:j+1]) for iseg,cstep,i,j in segments]
         return s
 
@@ -231,219 +226,6 @@ class DetectLongestOrthodromyLoxodromy(Detect):
             ds[k]=self.extract_segments_xy(crs,df,k)#,self.criterias,self.params)
         return ds
 
-def mainold():
-
-    import matplotlib.pyplot as plt
-    import matplotlib.dates as mdates
-    from traffic.data import opensky, navaids
-    import time
-    from datetime import datetime
-    from figures import read_config
-    import filter_trajs
-    # print(list(navaids))
-    # raise Exception
-    import pandas as pd
-    import argparse
-    config = read_config()
-    parser = argparse.ArgumentParser(
-        description='fit trajectories and save them in folders',
-    )
-    SAVEFIG=False
-    add_parser(parser)
-    parser.add_argument('-r',type=float,default=0.5)
-    parser.add_argument('-dolmax',type=float,default=30)
-    # parser.add_argument('-smooth',type=float,default=0.01)
-    # parser.add_argument('-track_tolerance_degrees',type=float,default=200000)
-    # parser.add_argument('-thresh_border',type=float,default=0.1)
-    # # parser.add_argument('-thresh_abs_mean_ratio',type=float,default=0.25)
-    # parser.add_argument('-model',default="quantile")
-    # parser.add_argument('-thresh_iou',type=float,default=0.1)
-    # parser.add_argument('-thresh_slope',type=float,default=1)
-    # parser.add_argument('-hit_tolerance',type=int,default=10)
-    # parser.add_argument('-timesplit',type=float)
-    parser.add_argument('-folderfigures',type=str)
-    parser.add_argument('-trajfile',type=str)
-    args = parser.parse_args()
-    if args.folderfigures is not None:
-        SAVEFIG = True
-        piecewise.SAVEFIG = True
-        piecewise.DEBUG = True
-        piecewise.FOLDER_FIGURES = args.folderfigures
-    #FILE = "source/raw_shortcut_flight.csv"
-    #FILE = "source/raw_neighbour_flight.csv"
-    #flights = read_format(FILE)
-    #flights = opensky.history("2022-07-15 00:44:24",stop="2022-07-15 23:44:24",departure_airport="LFBO").data#,callsign="FOX50A")#.data#.iloc[:10000]
-#    flights = opensky.history("2022-07-15 00:44:24",stop="2022-07-15 23:44:24",callsign="EDC749").data#.iloc[:10000]
-    #flights = opensky.history("2022-07-15 00:44:24",stop="2022-07-15 23:44:24",callsign="EZY18AN").data#.iloc[:10000]
-    #flights = opensky.history("2024-06-09 09:44:24",stop="2024-06-09 15:44:24",departure_airport="LFBO",arrival_airport="LIPQ").data#.iloc[:10000]
-#    flights = opensky.history("2024-05-09 03:44:24",stop="2024-05-09 12:44:24",callsign="RYR1338").data#.iloc[:10000]
-    #flights = opensky.history("2024-06-09 09:44:24",stop="2024-06-09 15:44:24",callsign="RYR3630").data#.iloc[:10000]
-    #AFR87GJ
-    #flights = pd.read_parquet("airac.parquet")#.query("icao24=='3415cf'")#.head(0000)#0a004b#0a0026#3415cf.query("icao24=='0a0026'")
-    # flights = pd.read_parquet("pb.parquet")
-    #flights.to_parquet("pb.parquet")
-    # flights = pd.read_parquet("airac.parquet").iloc[:50000]
-    #flights = pd.read_parquet(f"{config.FOLDER}/trajs/2022-07-14.parquet").query("icao24=='34364e'").query("callsign=='ANE46SQ'")
-    # icao24='4cad0f';start=1658052173;stop=1658052992;selecteddate='2022-07-17' # loxo-ortho ok ! 24414
-    # icao24='3964e4';start=1658222384;stop=1658222580#; 24413 loxo-ortho
-    # icao24='40751c';start=1658661774;stop=1658662581;#24419 ok, mais bof qd meme
-    # icao24='4841d8';start=1658053448;stop=1658053797; 24426 nope !
-    # icao24='4ca242';start=1658776939;stop=1658777238; 24433 presque mais tres nordsur
-    # icao24='406c43';start=1658998169;stop=1658998835#; 24443 1er ortho
-    # icao24='406b6d';start=1658735962;stop=1658736457#;
-    # icao24='40655b';start=1658994771;stop=1658995575#1658736457#;24459
-    # icao24='4ca8fb';start=1659792582;stop=1659792924#1658487865
-    # icao24='aa5f41';start=1658757581;stop=1658758152# bof 270 400
-    # icao24='4bb186';start=1659093475;stop=1659093962# ok mais bof 90 400
-    # icao24='4bb186';start=1659093475;stop=1659093962# ok mais bof 90 400
-    # icao24='aa9093';start=1658487531;stop=1658487865#duration=334track=90.1085; bof
-#    icao24='4ca8fb';start=1659792582;stop=1659792924#duration=342track=270.1483;
-#    icao24='aa9801';start=1658915682;stop=1658916359#duration=677track=279.9327;
-    # icao24='7380c2';start=1660055547;stop=1660055817#duration=270track=259.5085;
-#    icao24='a1f1a0';start=1658208924;stop=1658209371#duration=447track=85.751;
-    #icao24='a1f1a0';start=1659854804;stop=1659855207#duration=403track=100.0782;
-    #icao24='4aca83';start=1658473349;stop=1658473552#duration=403track=100.0782;
-    #icao24='48597d';start=1658502732;stop=1658503007#duration=403track=100.0782;
-    # icao24='4d2311';start=1659523048;stop=1659523175#duration=270track=259.5085;
-    # icao24='4ac9eb';start=1659950920;stop=1659953185#duration=270track=259.5085;
-    # icao24='34364e';start=1657776663;stop=1657776663
-    # icao24='4ac9eb';start=1659950970;stop=1659953145 # needs 0.5
-    # icao24='a1f1a0';start=1659854804;stop=1659855207#duration=403track=100.0782;
-    icao24='4bb0eb';start=1659357150;stop=1659357150#duration=403track=100.0782;
-    icao24='3944ef';start=1657972484;stop=1657972484#duration=403track=100.0782;
-    icao24='a1f1a0';start=1659854804;stop=1659855207
-    icao24='43edf0';start=1659424603;stop=1659425670
-    icao24='501db3';start=1659692865;stop=1659425670
-    icao24='aaed0d';start=1659701797;stop=1659425670
-    icao24='43edf0';start=1659424603;stop=1659425670
-    icao24='a1f1a0';start=1659854804;stop=1659855207
-    # icao24='40660c';start=1659507285;stop=1659509317#1659855207
-    # icao24='4caf7e';start=1658907489;stop=1658909950#1659509317#1659855207
-    if args.trajfile is None:
-        selecteddate=datetime.fromtimestamp(start).strftime("%Y-%m-%d")
-        flights = filter_trajs.read_trajectories(f"{config.FOLDER}/trajs/{selecteddate}.parquet",queries=[f"icao24=={repr(icao24)}"])#,"callsign=='AAL111'","callsign=='2NAOM'"
-        # flights = filter_trajs.read_trajectories(f"{config.FOLDER}/savan.parquet").query("callsign=='SAVAN07'")
-        print(flights.icao24.unique())
-        # flights["tunix"] = flights["timestamp"].astype(int)//10**9#timestamp()
-        start = start - 1200
-        stop = stop + 1200
-        flights = flights.query("@start<=tunix<=@stop")
-    else:
-        flights = filter_trajs.read_trajectories(args.trajfile)
-    print(flights["date"])
-    # flights = flights.query("icao24=='4cc0df'").query("callsign=='BCS142'").query("date=='2022-07-14'").reset_index()
-    # flights.to_parquet("pb.parquet")
-    # flights = flights.iloc[0:40000]
-    # flights = filter_trajectories(flights, "classic")#.query("icao24=='3415cf'")#.head(0000)#0a004b#0a0026#3415cf.query("icao24=='0a0026'")
-    # raise Exception
-    #0a004b#0a0026
-    #02a18e
-    print(flights)
-    #print(df.latitude.isna().mean())
-    t0 = time.time()
-    groupby = ["icao24","callsign","date"]
-    print(flights.groupby(by=groupby).count())
-    kwargs = extract_args(args)
-    res = flights.groupby(by=groupby).apply(DetectLongestOrthodromyLoxodromy(**kwargs).apply,include_groups=True).reset_index(drop=True)
-    res.to_csv("newfigures/longest.csv")
-    print(list(res))
-    res["dangle"] = res["maxangle"]-res["minangle"]
-    #res = flights.filter(DetectOrthodromyLoxodromy()).data
-
-    print(time.time()-t0)
-    print(res)
-    # res = res.query("dolmax==0.")
-    for g,df in res.groupby(by=groupby):
-        print(g)
-        # print(df.query("npts>10"))
-        dfl=df.query("iswhat=='loxodromy'")#.query("dlmax<=@r*dolmax").query("dlmax<=@r*domax").query("npts>10")
-        dfo=df.query("iswhat=='orthodromy'")#.query("domax<=@r*dolmax").query("domax<=@r*dlmax").query("npts>10")
-        header = ["iswhat","dolmax","domax","dlmax","lever","slope","icao24","callsign",'start',"stop","npts"]
-        print(dfo[header])
-        print(dfl[header])
-        # if what == "is_loxodromy":
-        # else:
-
-        print(df.dtypes)
-
-        #what="is_orthodromy"
-        traj=flights
-        fig = plt.figure()
-        go = plt.scatter(traj.longitude,traj.latitude,c="black")
-        go.set_label("ADS-B trajectory")
-        toiter = [(dfl,"is_loxodromy","+",20),(dfo,"is_orthodromy","x",1)]
-        for (nf,what,marker,s) in toiter:
-            i=0
-            for _,line in nf.iterrows():
-                i+=1
-                seg = traj.query("@line.start<=tunix").query("tunix<=@line.stop")
-                go = plt.scatter(seg.longitude,seg.latitude,marker=marker,s=s)
-                go.set_label(f"{what[3:]} #{i}")
-        plt.xlabel("longitude [°]")
-        plt.ylabel("latitude [°]")
-        plt.gca().set_aspect("equal")
-        plt.legend(frameon=False,handletextpad=0.2)
-        if SAVEFIG:
-            fig.set_tight_layout({'pad':0})
-            fig.set_figwidth(4)
-            plt.savefig(f"{args.folderfigures}/latlon.pdf", dpi=300, bbox_inches='tight')
-            plt.clf()
-        else:
-            plt.show()
-        fig = plt.figure()
-        go=plt.scatter(traj.timestamp,traj.track,c="black")
-        go.set_label("ADS-B trajectory")
-
-        for (nf,what,marker,s) in toiter:
-            i=0
-            numero = []
-            for _,line in nf.iterrows():
-                i+=1
-                seg = traj.query("@line.start<=tunix").query("tunix<=@line.stop")
-                seg["timestamp"]=seg["timestamp"].astype("datetime64[ns, UTC]")
-                # print(seg.dtypes)
-                # print(seg.timestamp.dt)
-                numero.append(i)
-                go=plt.scatter(seg.timestamp,seg.track,marker=marker,s=s)
-                go.set_label(f"{what[3:]} #{i}")
-            nf["segment number"] = numero
-            plt.xlabel("time")
-            plt.ylabel("ADS-B track angle [°]")
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%H:%M:%S"))
-        plt.xticks(rotation=45)
-        plt.legend(frameon=False,handletextpad=0.2)
-        if SAVEFIG:
-            fig.set_tight_layout({'pad':0})
-            fig.set_figwidth(4)
-            plt.savefig(f"{args.folderfigures}/timetrack.pdf", dpi=300, bbox_inches='tight')
-            # plt.clf()
-        else:
-            plt.show()
-        dfl["me"] = dfl["dlmax"]
-        dfo["me"] = dfo["domax"]
-        dfl["other"] = dfl["domax"]
-        dfo["other"] = dfo["dlmax"]
-        nf = pd.concat([dfl,dfo],ignore_index=True)
-        nf["pure"]= (nf.dolmax>args.dolmax) & (nf.me <nf.other * args.r) & (nf.me < nf.other * args.r)
-        nf["maxloxo"]=dfl["segment number"].max()
-        nf["maxortho"]=dfo["segment number"].max()
-#        nf = nf.query("dolmax>@args.dolmax").query("me<dolmax*@args.r").query("me<other*@args.r")
-        nf["identified"] = nf["iswhat"]
-        nf["ortho-loxo [m]"]=nf["dolmax"]
-        nf["adsb-loxo [m]"]=nf["dlmax"]
-        nf["ortho-adsb [m]"]=nf["domax"]
-        nf["duration [s]"]=nf["stop"]-nf["start"]
-        if args.folderfigures is not None:
-            with open(f"{args.folderfigures}/tablelongest.tex",'w') as f:
-                f.write(nf[["identified","pure","segment number","duration [s]","ortho-loxo [m]","adsb-loxo [m]","ortho-adsb [m]"]].to_latex(index=False,float_format="%.2f"))
-        nf[["identified","pure","maxloxo","maxortho","segment number","start","stop"]].to_csv("segments_longest.csv",index=False)
-    dlatlon = 3
-    minlat = flights.latitude.min() - dlatlon
-    maxlat = flights.latitude.max() + dlatlon
-    minlon = flights.longitude.min() - dlatlon
-    maxlon = flights.longitude.max() + dlatlon
-    def isok(nav):
-        return nav.type == "DME" and minlon<=nav.longitude <=maxlon and minlat<=nav.latitude <=maxlat
 
 if __name__ == '__main__':
     detect_classic.test_one(DetectLongestOrthodromyLoxodromy,"longest")

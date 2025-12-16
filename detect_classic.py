@@ -437,10 +437,6 @@ class DetectOrthodromyWithBeacons(Detect):
         return s
 
 
-
-
-
-
 def test_one(cls,prefix):
     import matplotlib.pyplot as plt
     import matplotlib.dates as mdates
@@ -457,94 +453,56 @@ def test_one(cls,prefix):
     parser = argparse.ArgumentParser(
         description='fit trajectories and save them in folders',
     )
-    cls.add_parser(parser)
-    
-    parser.add_argument('-folderfigures',type=str)
-    # parser.add_argument('-lever_crit',type=float,default=5)
-    args = parser.parse_args()
     SAVEFIG=False
+    cls.add_parser(parser)
+    parser.add_argument('-r',type=float,default=0.5)
+    parser.add_argument('-dolmax',type=float,default=30)
+    parser.add_argument('-folderfigures',type=str)
+    parser.add_argument('-trajfile',type=str)
+    args = parser.parse_args()
     if args.folderfigures is not None:
-        SAVEFIG = False
+        SAVEFIG = True
         piecewise.SAVEFIG = True
         piecewise.DEBUG = True
         piecewise.FOLDER_FIGURES = args.folderfigures
-    # icao24='a1f1a0';start=1659854804;stop=1659855207#duration=403track=100.0782;
-#    icao24='3944ef';start=1657972484;stop=1657972484#duration=403track=100.0782;
     icao24='a1f1a0';start=1659854804;stop=1659855207
-#    icao24='4caf7e';start=1658907489;stop=1658909950#1659509317#1659855207
-    selecteddate=datetime.fromtimestamp(start).strftime("%Y-%m-%d")
-    flights = filter_trajs.read_trajectories(f"{config.FOLDER}/trajs/{selecteddate}.parquet",queries=[f"icao24=={repr(icao24)}"])#.query("callsign=='TRA618T'")
-    flightplans = filter_trajs.convert(pd.read_parquet(f"{config.FOLDER}/detectedref.parquet"))
-    flightplans["icao24"]=flightplans["icao24"].astype("string[python]")
-    print(flightplans.dtypes)
-    print(flights.dtypes)
-    # raise Exception
-    # print(flightplans)
-    # raise Exception
-    # flights["tunix"] = flights["timestamp"].astype(int)//10**9#timestamp()
-    start = start - 1200
-    stop = stop + 1200
-    flights = flights.query("@start<=tunix<=@stop")
-    #.query("callsign=='RAM1668'").query("icao24=='02006f'")
-    #flights = pd.read_parquet("/disk2/newjson/trajs/2022-08-10.parquet").query("icao24=='c0799a'").query("callsign=='TSC9434'")
-    #flights = pd.read_parquet("airacsmall.parquet").query("callsign=='RAM1617'").query("icao24=='02006f'")#.query("icao24=='34364e'")
-    #flights = flights.query("icao24 == @flights.icao24.unique()[2]")
-    # flights.to_parquet("ech.parquet")
-    # raise Exception
-    flights["date"] = flights["timestamp"].dt.date
-    print(flights["date"])
-    # flights = flights.query("icao24=='4cc0df'").query("callsign=='BCS142'").query("date=='2022-07-14'").reset_index()
-    # flights.to_parquet("pb.parquet")
-    # flights = flights.iloc[0:40000]
-    # flights = filter_trajectories(flights, "classic")#.query("icao24=='3415cf'")#.head(0000)#0a004b#0a0026#3415cf.query("icao24=='0a0026'")
-    # flights = flights.dropna(subset=["track","latitude"])#.reset_index(drop=True)
-
-    # print(flights["date"])
-    # raise Exception
-    #0a004b#0a0026
-    #02a18e
-    print(flights)
-    #print(df.latitude.isna().mean())
+    if args.trajfile is None:
+        selecteddate=datetime.fromtimestamp(start).strftime("%Y-%m-%d")
+        flights = filter_trajs.read_trajectories(f"{config.FOLDER}/trajs/{selecteddate}.parquet",queries=[f"icao24=={repr(icao24)}"])#,"callsign=='AAL111'","callsign=='2NAOM'"
+        # flights = filter_trajs.read_trajectories(f"{config.FOLDER}/savan.parquet").query("callsign=='SAVAN07'")
+        print(flights.icao24.unique())
+        # flights["tunix"] = flights["timestamp"].astype(int)//10**9#timestamp()
+        start = start - 1200
+        stop = stop + 1200
+        flights = flights.query("@start<=tunix<=@stop")
+    else:
+        flights = filter_trajs.read_trajectories(args.trajfile)
+    #print(flights["date"])
     t0 = time.time()
     groupby = ["icao24","callsign","date"]
-    print(flights.groupby(by=groupby).count())
-    # kwargs = {k:v for k,v in vars(args).items()}
-    # del kwargs["folderfigures"]
-    kwargs=cls.extract_args(args)#["flightplans"] = pd.read_parquet(args.flightplans)
-    detector = cls(**kwargs)
-#    res = flights.groupby(by=groupby).apply(DetectOrthodromyWithBeacons(extract_flightplan=extract_flightplan,thresh_border=args.thresh_border,flightplans=flightplans,smooth=args.smooth,angle_precision=args.angle_precision,thresh=args.thresh,thresh_iou=args.thresh_iou,timesplit=args.timesplit,min_distance=args.min_distance).apply,include_groups=True).reset_index(drop=True)
-    res = flights.groupby(by=groupby).apply(detector.apply,include_groups=True).reset_index(drop=True)
+    #print(flights.groupby(by=groupby).count())
+    kwargs = cls.extract_args(args)
+    res = flights.groupby(by=groupby).apply(cls(**kwargs).apply,include_groups=True).reset_index(drop=True)
     res.to_csv(f"{args.folderfigures}/{prefix}.csv")
-    print(list(res))
+    #print(list(res))
     res["dangle"] = res["maxangle"]-res["minangle"]
-
     print(time.time()-t0)
     print(res)
-    header = ["iswhat","dolmax","domax","dlmax","lever","slope","icao24","callsign",'start',"stop","npts"]
-    # res = res.query("dolmax==0.")
     for g,df in res.groupby(by=groupby):
-        print(g)
-        print(df.query("npts>10"))
-        dfl=df.query("iswhat=='loxodromy'")#.query("dlmax<=0.5*dolmax").query("dlmax<=0.5*domax").query("npts>10")
-        dfo=df.query("iswhat=='orthodromy'")#.query("domax<=0.5*dolmax").query("domax<=0.5*dlmax").query("npts>10")
-        print(dfo[header])
-        print(dfl[header])
-        # if what == "is_loxodromy":
-        # else:
-
-        print(df.dtypes)
-
-        #what="is_orthodromy"
+        dfl=df.query("iswhat=='loxodromy'").copy()#.query("dlmax<=@r*dolmax").query("dlmax<=@r*domax").query("npts>10")
+        dfo=df.query("iswhat=='orthodromy'").copy()#.query("iswhat=='orthodromy'")#.query("domax<=@r*dolmax").query("domax<=@r*dlmax").query("npts>10")
+        header = ["iswhat","dolmax","domax","dlmax","lever","slope","icao24","callsign",'start',"stop","npts"]
         traj=flights
         fig = plt.figure()
         go = plt.scatter(traj.longitude,traj.latitude,c="black")
         go.set_label("ADS-B trajectory")
-        for (nf,what) in [(dfl,"is_loxodromy"),(dfo,"is_orthodromy")]:
+        toiter = [(dfl,"is_loxodromy","+",20),(dfo,"is_orthodromy","x",1)]
+        for (nf,what,marker,s) in toiter:
             i=0
             for _,line in nf.iterrows():
                 i+=1
                 seg = traj.query("@line.start<=tunix").query("tunix<=@line.stop")
-                go = plt.scatter(seg.longitude,seg.latitude)
+                go = plt.scatter(seg.longitude,seg.latitude,marker=marker,s=s)
                 go.set_label(f"{what[3:]} #{i}")
         plt.xlabel("longitude [°]")
         plt.ylabel("latitude [°]")
@@ -561,19 +519,18 @@ def test_one(cls,prefix):
         go=plt.scatter(traj.timestamp,traj.track,c="black")
         go.set_label("ADS-B trajectory")
 
-        for (nf,what) in [(dfl,"is_loxodromy"),(dfo,"is_orthodromy")]:
+        for (nf,what,marker,s) in toiter:
             i=0
             numero = []
             for _,line in nf.iterrows():
                 i+=1
                 seg = traj.query("@line.start<=tunix").query("tunix<=@line.stop")
                 seg["timestamp"]=seg["timestamp"].astype("datetime64[ns, UTC]")
-                # print(seg.dtypes)
-                # print(seg.timestamp.dt)
                 numero.append(i)
-                go=plt.scatter(seg.timestamp,seg.track)
+                go=plt.scatter(seg.timestamp,seg.track,marker=marker,s=s)
                 go.set_label(f"{what[3:]} #{i}")
-            nf["segment number"] = numero
+            nf.loc[:,"segment number"]=numero
+            #raise Exception(nf)
             plt.xlabel("time")
             plt.ylabel("ADS-B track angle [°]")
         plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%H:%M:%S"))
@@ -586,14 +543,24 @@ def test_one(cls,prefix):
             # plt.clf()
         else:
             plt.show()
+        dfl["me"] = dfl["dlmax"]
+        dfo["me"] = dfo["domax"]
+        dfl["other"] = dfl["domax"]
+        dfo["other"] = dfo["dlmax"]
         nf = pd.concat([dfl,dfo],ignore_index=True)
+        nf["pure"]= (nf.dolmax>args.dolmax) & (nf.me <nf.other * args.r) & (nf.me < nf.other * args.r)
+        nf["maxloxo"]=dfl["segment number"].max()
+        nf["maxortho"]=dfo["segment number"].max()
+#        nf = nf.query("dolmax>@args.dolmax").query("me<dolmax*@args.r").query("me<other*@args.r")
         nf["identified"] = nf["iswhat"]
         nf["ortho-loxo [m]"]=nf["dolmax"]
         nf["adsb-loxo [m]"]=nf["dlmax"]
         nf["ortho-adsb [m]"]=nf["domax"]
         nf["duration [s]"]=nf["stop"]-nf["start"]
-        print(nf[["identified","segment number","duration [s]","ortho-loxo [m]","adsb-loxo [m]","ortho-adsb [m]"]].to_latex(index=False,float_format="%.2f"))
-        nf[["identified","segment number","start","stop"]].to_csv("segments_classic.csv",index=False)
+        if args.folderfigures is not None:
+            with open(f"{args.folderfigures}/table{prefix}.tex",'w') as f:
+                f.write(nf[["identified","pure","segment number","duration [s]","ortho-loxo [m]","adsb-loxo [m]","ortho-adsb [m]"]].to_latex(index=False,float_format="%.2f"))
+        nf[["identified","pure","maxloxo","maxortho","segment number","start","stop"]].to_csv("segments_longest.csv",index=False)
     dlatlon = 3
     minlat = flights.latitude.min() - dlatlon
     maxlat = flights.latitude.max() + dlatlon
@@ -601,6 +568,10 @@ def test_one(cls,prefix):
     maxlon = flights.longitude.max() + dlatlon
     def isok(nav):
         return nav.type == "DME" and minlon<=nav.longitude <=maxlon and minlat<=nav.latitude <=maxlat
+
+
+
+
 
 if __name__ == '__main__':
     test_one(DetectOrthodromyWithBeacons,"classic")

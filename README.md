@@ -65,3 +65,4 @@ plt.gca().set_aspect('equal')
 plt.show()
 ```
 # identifyingortholoxo
+MEMO: hit_tolerance bug, must be at 0

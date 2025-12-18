@@ -1,5 +1,4 @@
 # Identifying Loxodromy and Orthodromy in ADS-B Trajectories
-## What is this repo ?
 This repo contains code for paper LINKTOPAPER. In this paper a method is presented to identify orthodromy and loxodromy segments on ADS-B aircraft trajectory.
 
 

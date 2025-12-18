@@ -3,7 +3,7 @@ import pygplates
 import pyproj
 import shapely
 import shapely.ops
-from pyproj import CRS, Geod
+from pyproj import Geod
 
 NM2METER = 1852
 
@@ -328,7 +328,7 @@ def main():
     low = 49
     high = 50
     lat1, lat2, lon1, lon2 = np.random.uniform(low=low, high=high, size=4)
-    latm, lonm = np.random.uniform(low=low, high=high, size=(2, n))
+    # latm, lonm = np.random.uniform(low=low, high=high, size=(2, n))
     #    latm,lonm = np.array([(lat1+lat2)/2]),np.array([(lon1+lon2)/2])
     # print(latm)
     print(lat1, lat2, lon1, lon2)
@@ -354,7 +354,7 @@ def main():
     dg, ds = distance_loxo_ortho(
         lat1, lon1, lat2, lon2
     )  # distance_loxo_fast(lat1,lon1,lat2,lon2,latm,lonm)
-    # print(time.time()-t0)
+    print(time.time()-t0)
     print(ds - dg, ds, dg)
 
 

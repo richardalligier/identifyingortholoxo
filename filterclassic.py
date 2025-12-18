@@ -1,22 +1,11 @@
 from traffic.algorithms import filters
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 
 
 from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
     ClassVar,
-    Dict,  # for python 3.8 and impunity
-    Generic,
-    Optional,
-    Protocol,
-    Type,
     TypedDict,
-    TypeVar,
-    cast,
 )
 
 def checktime(df):

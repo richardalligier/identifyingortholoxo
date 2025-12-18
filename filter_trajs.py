@@ -1,8 +1,7 @@
 import pandas as pd
 
 import argparse
-from detect_classic import FlightPlanDatabase, NoFlightPlan, Detect
-from detect_orthodromy import filter_trajectories
+from detect_classic import FlightPlanDatabase, NoFlightPlan, Detect, filter_trajectories
 
 def convert(df):
     for col in df.select_dtypes(include="string[pyarrow]"):
@@ -35,26 +34,7 @@ def read_trajectories(filein,queries=None):
     flights = filter_trajectories(flights, "classic")
     flights = flights.dropna(subset=["track","latitude"])
     return flights
-# def read_trajectories(f, strategy):
-#     ''' read a trajectory file named @f, and filters points using a @strategy'''
-#     df = pd.read_parquet(f)
-#     for v in ["flight_id"]:
-#         df[v] = df[v].astype(np.int64)
-#     df = df.drop_duplicates(["flight_id","timestamp"]).sort_values(["flight_id","timestamp"]).reset_index(drop=True)#.head(10_000)
-#     if strategy == "classic":
-#         filter = FilterCstLatLon()|FilterCstPosition()|FilterCstSpeed()|MyFilterDerivative()|FilterIsolated()
-#     else:
-#         raise Exception(f"strategy '{strategy}' not implemented")
-#     dftrafficin = Traffic(df).filter(filter=filter,strategy=nointerpolate).eval(max_workers=1).data
-#     dico_tomask = {
-#         # "track":["track_unwrapped"],
-#         "latitude":["u_component_of_wind","v_component_of_wind","temperature"],
-#         "altitude":["u_component_of_wind","v_component_of_wind","temperature"],
-#     }
-#     for k,lvar in dico_tomask.items():
-#         for v in lvar:
-#             dftrafficin[v] = dftrafficin[[v]].mask(dftrafficin[k].isna())
-#     return dftrafficin
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -66,8 +46,7 @@ def main():
     parser.add_argument("-timesplit",type=float,required=True)
     args = parser.parse_args()
     flights = read_trajectories(args.trajsin)
-    flightplans = pd.read_parquet(args.flightplans)
-    basedetector = Detect()#OrthodromyWithBeacons(flightplans=flightplans,timesplit=args.timesplit)
+    basedetector = Detect()
     fpdatabase = FlightPlanDatabase(args.flightplans)
     def keep_with_fp(df):
         try:

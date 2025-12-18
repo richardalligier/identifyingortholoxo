@@ -1,16 +1,5 @@
-import pyproj
-from pyproj import Geod
-import pandas as pd
-import numpy as np
 import argparse
-import os
 import time
-
-from traffic.core import Traffic
-# from filterclassic import FilterCstLatLon
-# from geosphere import orthodromy, loxodromy, distance_ortho_pygplates, distance_without_time_exact,distance_loxo,distance_loxo_ortho#distance_degree
-import tqdm
-import detect_orthodromy
 import detect_classic
 import detect_longest
 import filter_trajs
@@ -47,15 +36,11 @@ def main():
     if flights.empty:
         flights.to_parquet(args.detectedout)
     else:
-        print(flights["date"].unique())
-        print(flights)
         t0 = time.time()
-        groupby = ["icao24","callsign","date"]
-        res = flights.groupby(by=groupby).apply(detector.apply,include_groups=True)#.reset_index()
+        res = detector.groupby_and_apply(flights)
         print(time.time()-t0)
         df=res.sort_values(by=["start"]).reset_index(drop=True)
         print(df)
-        print(df.dtypes)
         df.to_parquet(args.detectedout)
 
 main()

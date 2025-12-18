@@ -115,7 +115,7 @@ def add_intersection(af, cf, suffix=""):
     af[d["iou"]] = 0.0
     af[d["inclusion_ratio"]] = 0.0
     # af[d["inclusion"]]=0.
-    for i, line in tqdm.tqdm(cf.iterrows()):
+    for _, line in tqdm.tqdm(cf.iterrows()):
         k = getkey(line)
         res[k] = []
         qf = af.query("date==@line.date").query("icao24==@line.icao24")

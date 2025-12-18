@@ -1,4 +1,4 @@
 FOLDER = outfiles
 FOLDER_DETECTEDREF_JSON = smallpartofthecataloguejusttoreproducethefigures/json/2207
 FOLDER_FIGURES= newfigures
-#/disk2/reproducejson
+#outfiles/disk2/reproducejson

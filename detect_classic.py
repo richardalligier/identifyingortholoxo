@@ -1,17 +1,12 @@
-# from detect_orthodromy import Detect, filter_trajectories, compute_angle
-from geosphere import orthodromy, loxodromy, distance_without_time_exact,distance_loxo_ortho,  my_distance_ortho,my_distance_loxo#distance_ortho_pygplates,distance_loxo
+from geosphere import distance_loxo_ortho,  my_distance_ortho,my_distance_loxo
 import numpy as np
 import pandas as pd
-import time
 from pyproj import CRS, Transformer
 from traffic.core import Traffic, mixins
 from filterclassic import FilterCstLatLon
 import csaps
 import piecewise
-#from traffic.algorithms.prediction.flightplan import Point
 
-DEBUG = False
-SAVEFIG = True
 
 def filter_trajectories(df, strategy):
     df = df.copy()
@@ -222,7 +217,6 @@ def remove_included(segs):
 
 
 def detect(tf,flightplan,params):
-    global old
     l=list(tf)
     assert(len(l)==1)
     aligned = l[0].aligned_on_navpoint(
@@ -254,13 +248,12 @@ def detect(tf,flightplan,params):
 
 
 def compute_angle(t,xr,yr,params):
-    n = xr.shape[0]
     xy = [xr,yr]
     sxy = csaps.csaps(t, xy, smooth=params["smooth"])
     pxy = sxy(t,nu=0)
-    if DEBUG:
-        print(((pxy[0]-xr)**2+(pxy[1]-yr)**2).mean())
-        print(np.sqrt(((pxy[0]-xr)**2+(pxy[1]-yr)**2).max()))
+#    if DEBUG:
+#        print(((pxy[0]-xr)**2+(pxy[1]-yr)**2).mean())
+#        print(np.sqrt(((pxy[0]-xr)**2+(pxy[1]-yr)**2).max()))
     dx,dy = sxy(t,nu=1)
     angle = np.degrees((np.arctan2(dy,dx)))
     return angle
@@ -291,9 +284,11 @@ class FlightPlanDatabase:
 
 
 class Detect:
-    _constantv = ["icao24","callsign","date"]
-    _integersv = ["start","stop","npts"]
-    _all = ["iswhat","dolmax","domax","dlmax","domean","dlmean","v","maxangle","minangle","stdangle","meanabsangleerror","lever"]+_integersv+_constantv+[f"{v}_{s}" for v in ["altitude","track"] for s in ["start","stop"]]
+    _constantv = ("icao24","callsign")
+    _integersv = ("start","stop","npts")
+    _all = ("iswhat","dolmax","domax","dlmax","domean","dlmean","v","maxangle","minangle","stdangle","meanabsangleerror","lever")+_integersv+_constantv+tuple(f"{v}_{s}" for v in ["altitude","track"] for s in ["start","stop"])
+    name_is_orthodromy = "orthodromy"
+    name_is_loxodromy = "loxodromy"
     @classmethod
     def add_parser(cls,parser):
         for k,v in cls.default.items():
@@ -308,12 +303,29 @@ class Detect:
         d={k:v for k,v in vars(args).items()}
         kwargs={k:d[k] for k in cls.default}
         return kwargs
+    def compute_tunix(self,timestamp):
+        return timestamp.astype(int)//10**9
+    def compute_t_lats_lons(self,df):
+        lats = df.latitude.values
+        lons = df.longitude.values
+        t = self.compute_tunix(df.timestamp).values
+        t = t - t[0]
+        return t,lats,lons
+    def compute_angle(self,crs_dest,t,lats,lons):
+        crs_geo = CRS.from_epsg(4326)
+        transformer = Transformer.from_crs(crs_geo, crs_dest, always_xy=True)
+        x,y = transformer.transform(lons,lats)
+        return np.unwrap(compute_angle(t,x,y,self.params),period=360)
+    def groupby_and_apply(self, df,by=None):
+        if by is None:
+            by=self._constantv
+        return df.groupby(by=list(by))[list(df)].apply(self.apply).reset_index(drop=True)
     def apply(self, df):
         return self.apply_splitted(df,lambda x: self._apply(x).astype({k:np.int64 for k in self._integersv}),self.params["timesplit"])
     def apply_splitted(self,df,f,timesplit):
         isok = (df["timestamp"].diff().dt.total_seconds().to_numpy()>timesplit)
         df["splitted"]= isok.cumsum()
-        res=df.groupby(by="splitted").apply(f)
+        res=df.groupby(by="splitted")[list(df)].apply(f,include_groups=False)
         return res
     def isvalid(self,r,df):#,latsin,lonsin,indexes):
         latsin = df.latitude.values
@@ -327,28 +339,38 @@ class Detect:
         lats = df.latitude.values
         lons = df.longitude.values
         track = df.track.values
-        nonnan = np.logical_and(track==track,np.logical_and(lats==lats,lons==lons))#np.ones(lats.shape,dtype=bool)
-        indexes = np.arange(lats.shape[0])[nonnan]
+        #nonnan = (track==track) & (lats==lats) &(lons==lons)#np.ones(lats.shape,dtype=bool)
+        nonnan = (~np.isnan(track)) & (~np.isnan(lats)) &(~np.isnan(lons))
+        #print(nonnan.dtype)
+        #assert(not nonnan.isna().any())
         dfnonan = df.loc[nonnan].reset_index(drop=True)
         d = {k:[] for k in self._all}
         n = dfnonan.shape[0]
         if n<=2:
             return pd.DataFrame(d)#.sort_values(by=["start"]).reset_index(drop=True)
-        t0 = time.time()
         def process(s,iswhat):
             for r in s:
-                i,j = r.interval
                 if self.isvalid(r,dfnonan):#,latsin,lonsin,indexes):#i+1<j and latsin[i]!=latsin[j] and lonsin[i]!=lonsin[j]:
                     self.process_one(dfnonan,d,r,iswhat)
         for k,s in self.extract_segments(dfnonan).items():
             process(s,k)
-        print(df.shape[0],time.time()-t0)
         for k in ["stop","start"]:
             d[k] = np.array(d[k])
         res = pd.DataFrame(d).sort_values(by=["start"]).reset_index(drop=True)
         for k,v in self.params.items():
             res[k]=v
         return res#.astype({k:np.int64 for k in self._integersv})
+    
+    def tag_pure(self,detected,r=0.5,dolmax=30.):
+        dfl = detected.query('iswhat==@self.name_is_loxodromy').copy()
+        dfo = detected.query('iswhat==@self.name_is_orthodromy').copy()
+        dfl["me"] = dfl["dlmax"]
+        dfo["me"] = dfo["domax"]
+        dfl["other"] = dfl["domax"]
+        dfo["other"] = dfo["dlmax"]
+        nf = pd.concat([dfl,dfo],ignore_index=True)
+        nf["pure"]= (nf.dolmax>dolmax) & (nf.me <nf.other * r) & (nf.me < nf.other * r)
+        return nf
     def process_one(self,df,d,r,iswhat):
         df = df.reset_index(drop=True)
         i,j = r.interval
@@ -383,8 +405,6 @@ class Detect:
         d["lever"].append(r.lever)#/self.params["track_tolerance_degrees"])
         d["meanabsangleerror"].append(r.meanabsangleerror)
         d["npts"].append(j-i+1)
-                    # d["cstep"].append(r.cstep)
-                    # d["iseg"].append(r.iseg)
 
 
 class DetectOrthodromyWithBeacons(Detect):
@@ -417,19 +437,13 @@ class DetectOrthodromyWithBeacons(Detect):
         flightplan = self.fpdatabase.extract_flightplan(df)#self.extract_flightplan(self.flightplans,df)
         if flightplan == []:
             return {}
-        t = (df.timestamp.astype(int)//10**9).values
-        t = t - t[0]
+        t,lats,lons = self.compute_t_lats_lons(df)
         track = df.track.values
-        lats = df.latitude.values
-        lons = df.longitude.values
         n =lats.shape[0]
         clat = lats[n//2]
         clon = lons[n//2]
         crs_dest = CRS.from_proj4(f"+proj=gnom +lat_0={clat} +lon_0={clon} +datum=WGS84 +units=m +no_defs")
-        crs_geo = CRS.from_epsg(4326)
-        transformer = Transformer.from_crs(crs_geo, crs_dest, always_xy=True)
-        x,y = transformer.transform(lons,lats)
-        angle = np.unwrap(compute_angle(t,x,y,self.params),period=360)
+        angle = self.compute_angle(crs_dest,t,lats,lons)
         tf = Traffic(df)
         indexes = detect(tf,flightplan,self.params)#extractor(df) #douglas_peucker_xy(t,track,x,y,criterias,params)
         s = {self.params["name_is_orthodromy"]:[build(lats,lons,iseg,cstep,i,j,angle[i:j+1]) for iseg,cstep,i,j in indexes]}
@@ -440,31 +454,28 @@ class DetectOrthodromyWithBeacons(Detect):
 def test_one(cls,prefix):
     import matplotlib.pyplot as plt
     import matplotlib.dates as mdates
-    from traffic.data import opensky, navaids
     import time
     from datetime import datetime
     from figures import read_config
     import filter_trajs
-    # print(list(navaids))
-    # raise Exception
     import pandas as pd
     import argparse
+
     config = read_config()
     parser = argparse.ArgumentParser(
         description='fit trajectories and save them in folders',
     )
-    SAVEFIG=False
     cls.add_parser(parser)
     parser.add_argument('-r',type=float,default=0.5)
     parser.add_argument('-dolmax',type=float,default=30)
     parser.add_argument('-folderfigures',type=str)
     parser.add_argument('-trajfile',type=str)
+    parser.add_argument('-identifiedcsv',type=str)
     args = parser.parse_args()
     if args.folderfigures is not None:
         SAVEFIG = True
-        piecewise.SAVEFIG = True
-        piecewise.DEBUG = True
-        piecewise.FOLDER_FIGURES = args.folderfigures
+        DEBUG = True
+        FOLDER_FIGURES = args.folderfigures
     icao24='a1f1a0';start=1659854804;stop=1659855207
     if args.trajfile is None:
         selecteddate=datetime.fromtimestamp(start).strftime("%Y-%m-%d")
@@ -477,21 +488,17 @@ def test_one(cls,prefix):
         flights = flights.query("@start<=tunix<=@stop")
     else:
         flights = filter_trajs.read_trajectories(args.trajfile)
-    #print(flights["date"])
     t0 = time.time()
-    groupby = ["icao24","callsign","date"]
-    #print(flights.groupby(by=groupby).count())
+    groupby = ["icao24","callsign"]
     kwargs = cls.extract_args(args)
-    res = flights.groupby(by=groupby).apply(cls(**kwargs).apply,include_groups=True).reset_index(drop=True)
-    res.to_csv(f"{args.folderfigures}/{prefix}.csv")
-    #print(list(res))
+    res = cls(**kwargs).groupby_and_apply(flights)
+    res.to_csv(f"{args.folderfigures}/{args.identifiedcsv}")
     res["dangle"] = res["maxangle"]-res["minangle"]
     print(time.time()-t0)
     print(res)
-    for g,df in res.groupby(by=groupby):
-        dfl=df.query("iswhat=='loxodromy'").copy()#.query("dlmax<=@r*dolmax").query("dlmax<=@r*domax").query("npts>10")
-        dfo=df.query("iswhat=='orthodromy'").copy()#.query("iswhat=='orthodromy'")#.query("domax<=@r*dolmax").query("domax<=@r*dlmax").query("npts>10")
-        header = ["iswhat","dolmax","domax","dlmax","lever","slope","icao24","callsign",'start',"stop","npts"]
+    for _,df in res.groupby(by=groupby):
+        dfl=df.query("iswhat=='loxodromy'").copy()
+        dfo=df.query("iswhat=='orthodromy'").copy()
         traj=flights
         fig = plt.figure()
         go = plt.scatter(traj.longitude,traj.latitude,c="black")
@@ -561,17 +568,6 @@ def test_one(cls,prefix):
             with open(f"{args.folderfigures}/table{prefix}.tex",'w') as f:
                 f.write(nf[["identified","pure","segment number","duration [s]","ortho-loxo [m]","adsb-loxo [m]","ortho-adsb [m]"]].to_latex(index=False,float_format="%.2f"))
         nf[["identified","pure","maxloxo","maxortho","segment number","start","stop"]].to_csv("segments_longest.csv",index=False)
-    dlatlon = 3
-    minlat = flights.latitude.min() - dlatlon
-    maxlat = flights.latitude.max() + dlatlon
-    minlon = flights.longitude.min() - dlatlon
-    maxlon = flights.longitude.max() + dlatlon
-    def isok(nav):
-        return nav.type == "DME" and minlon<=nav.longitude <=maxlon and minlat<=nav.latitude <=maxlat
-
-
-
-
 
 if __name__ == '__main__':
     test_one(DetectOrthodromyWithBeacons,"classic")

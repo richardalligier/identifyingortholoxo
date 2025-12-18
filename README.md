@@ -51,7 +51,7 @@ Output
 32  orthodromy  1647883585  1647883667  1.500197e+00  6.004350e+00  7.155667e+00  False
 33  orthodromy  1647884440  1647884459  4.385401e-08  4.385401e-08  5.234188e-08  False
 ```
-`detected` is a dataframe containing statistics on the, where:
+`detected` is a dataframe containing statistics on the detected curves, where:
 - `iswhat` which type of curve was identified
 - `start` unix timestamp of the start of the curve
 - `stop` unix timestamp of the end of the curve
@@ -60,6 +60,8 @@ Output
 - `domax` maximum distance between the trajectory points and the orthodromy connecting starting and ending points, in meters
 - `dlmax` maximum distance between the trajectory points and the loxodromy connecting starting and ending points, in meters
 - `pure` whether the `iswhat` curve confidently fits the trajectory points and is very different from the other type of curve
+
+The identified curves can be plotted with the code below:
 ```
 import matplotlib.pyplot as plt
 df = df.assign(tunix = detect.compute_tunix(df.timestamp))
@@ -72,3 +74,4 @@ for _,line in detected.query('pure').iterrows():
 plt.gca().set_aspect('equal')
 plt.show()
 ```
+![alt text](FigureReadmegithub.png)

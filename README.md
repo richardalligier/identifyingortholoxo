@@ -1,8 +1,9 @@
-# What is this repo ?
-This repo contains code for paper LINKTOPAPER. In this paper a method is presented to identify orthodromy and loxodromy segments on ADS-B aircraft trajectory. The method groupby_and_apply of the class  DetectLongestOrthodromyLoxodromy returns a dataframe of the identified orthodromies and loxodromies, one row per segment. Each row contains statistics on the identified segment.
+# Identifying Loxodromy and Orthodromy in ADS-B Trajectories
+## What is this repo ?
+This repo contains code for paper LINKTOPAPER. In this paper a method is presented to identify orthodromy and loxodromy segments on ADS-B aircraft trajectory. The method `groupby_and_apply` of the class  `DetectLongestOrthodromyLoxodromy` returns a dataframe of the identified orthodromies and loxodromies, one row per segment. Each row contains statistics on the identified segment.
 
 
-# How to use it
+## How to use it
 ```
 from traffic.data.samples import savan
 from detect_longest import DetectLongestOrthodromyLoxodromy
@@ -50,8 +51,15 @@ Output
 32  orthodromy  1647883585  1647883667  1.500197e+00  6.004350e+00  7.155667e+00  False
 33  orthodromy  1647884440  1647884459  4.385401e-08  4.385401e-08  5.234188e-08  False
 ```
-detected is a dataframe containing statistics on the
-
+`detected` is a dataframe containing statistics on the, where:
+- `iswhat` which type of curve was identified
+- `start` unix timestamp of the start of the curve
+- `stop` unix timestamp of the end of the curve
+- `dolmax` maximum distance between the orthodromy and loxodromy connecting starting and ending points, in meters
+- `dolmax` maximum distance between the orthodromy and loxodromy connecting starting and ending points, in meters
+- `domax` maximum distance between the trajectory points and the orthodromy connecting starting and ending points, in meters
+- `dlmax` maximum distance between the trajectory points and the loxodromy connecting starting and ending points, in meters
+- `pure` whether the `iswhat` curve confidently fits the trajectory points and is very different from the other type of curve
 ```
 import matplotlib.pyplot as plt
 df = df.assign(tunix = detect.compute_tunix(df.timestamp))
@@ -64,5 +72,3 @@ for _,line in detected.query('pure').iterrows():
 plt.gca().set_aspect('equal')
 plt.show()
 ```
-# identifyingortholoxo
-MEMO: hit_tolerance bug, must be at 0

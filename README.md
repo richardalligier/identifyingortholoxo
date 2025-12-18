@@ -1,9 +1,10 @@
 # Identifying Loxodromy and Orthodromy in ADS-B Trajectories
 ## What is this repo ?
-This repo contains code for paper LINKTOPAPER. In this paper a method is presented to identify orthodromy and loxodromy segments on ADS-B aircraft trajectory. The method `groupby_and_apply` of the class  `DetectLongestOrthodromyLoxodromy` returns a dataframe of the identified orthodromies and loxodromies, one row per segment. Each row contains statistics on the identified segment.
+This repo contains code for paper LINKTOPAPER. In this paper a method is presented to identify orthodromy and loxodromy segments on ADS-B aircraft trajectory.
 
 
 ## How to use it
+The method `groupby_and_apply` of the class  `DetectLongestOrthodromyLoxodromy` returns a dataframe of the identified orthodromies and loxodromies, one row per segment. Each row contains statistics on the identified segment.
 ```
 from traffic.data.samples import savan
 from detect_longest import DetectLongestOrthodromyLoxodromy

@@ -22,21 +22,13 @@ def down_day(day):
     return pd.concat(ldf,ignore_index=True)
 
 
-def mainsavan():
-    parser = argparse.ArgumentParser(
-        description='fit trajectories and save them in folders',
-    )
-    parser.add_argument('-foldertrajs')
-    args = parser.parse_args()
-    savan.to_parquet(os.path.join(args.foldertrajs,"savan.parquet"))
-
 def main():
     parser = argparse.ArgumentParser(
         description='fit trajectories and save them in folders',
     )
     parser.add_argument('-foldertrajs')
     args = parser.parse_args()
-    start = datetime.datetime(2022,7,14)
+    start = datetime.datetime(2022,7,15)
     end = datetime.datetime(2022,8,11)
     for day in daterange(start,end):
         date = day.strftime("%Y-%m-%d")
@@ -45,4 +37,4 @@ def main():
         df = df.sort_values(by=["callsign","icao24","timestamp"]).reset_index()
         df.to_parquet(os.path.join(args.foldertrajs,date)+".parquet")
 
-mainsavan()
+main()

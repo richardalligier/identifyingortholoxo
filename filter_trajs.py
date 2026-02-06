@@ -60,7 +60,8 @@ def main():
     flights = basedetector.apply_splitted(flights,split_and_keep,args.timesplit)
     print(list(flights))
     if not flights.empty:
-        flights = flights.reset_index(drop=True).sort_values(by=groupby).drop(columns=["index","splitted","date","tunix"])
+        flights = flights.reset_index(drop=True).sort_values(by=groupby).drop(columns=["splitted","date","tunix"])
+        assert("index" not in flights)
     flights.to_parquet(args.trajsout,index=False)
 
 

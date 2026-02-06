@@ -152,7 +152,10 @@ if __name__ == '__main__':
             for k,crs in dcrs.items():
                 ds[k]=self.extract_segments_xy(crs,df,k)#,self.criterias,self.params)
                 angle= self.compute_angle(crs,t,lats,lons)
-                (lower,upper) = tuple(map(np.array, zip(*[s.interval for s in ds[k]])))
+                res = tuple(map(np.array, zip(*[s.interval for s in ds[k]])))
+                if len(res) == 0:
+                    res = ([],[])
+                (lower,upper) = res
                 piecewise.plotdebug(angle,(lower,upper),k,f"{k}after.pdf")
             return ds
     detect_classic.test_one(DetectLongestOrthodromyLoxodromyDebug,"longest")

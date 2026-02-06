@@ -8,6 +8,13 @@ from traffic.core import Flight, Traffic
 
 from detect_longest import DetectLongestOrthodromyLoxodromy
 
+import argparse
+parser = argparse.ArgumentParser(
+        description='fit trajectories and save them in folders',
+)
+parser.add_argument('-folderfigures')
+args = parser.parse_args()
+
 icao24 = "a1f1a0"
 start = 1659854804
 stop = 1659855207
@@ -21,16 +28,7 @@ flight = flight.assign(date=flight.data.timestamp.dt.date)
 flight
 
 # %%
-res = DetectLongestOrthodromyLoxodromy(
-    timesplit=3600,
-    smooth=0.01,
-    thresh_iou=0.1,
-    track_tolerance_degrees=0.5,
-    thresh_slope=0.001,
-    thresh_border=0.1,
-    r=0.5,
-    dolmax=30,
-).apply(flight.data)
+res = pd.read_csv(f"{args.folderfigures}/longest.csv")
 res = res.assign(dangle=res["maxangle"] - res["minangle"])
 res = (
     res.reset_index()
@@ -38,7 +36,7 @@ res = (
         start=pd.to_datetime(res.start.values, unit="s", utc=True),
         stop=pd.to_datetime(res.stop.values, unit="s", utc=True),
     )
-    .drop(columns="date")
+    #.drop(columns="date")
 )
 res
 # %%
@@ -125,5 +123,5 @@ chart = (
         titleFont="Roboto Condensed",
     )
 )
-chart.save("ortho_loxo.pdf")
+chart.save(f"{args.folderfigures}/ortho_loxo.pdf")
 chart

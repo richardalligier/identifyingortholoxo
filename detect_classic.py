@@ -64,6 +64,8 @@ def reducetrack(ij,tin,trackin,params):#thresh_border,thresh_slope):
     m.fit(t[:,None],track)
     strack = m.predict(t[:,None])
     slope = abs(m.coef_[0])
+    if params["thresh_slope"] is None and params["thresh_border"] is None:
+        return slope,(i,j)
     if params["thresh_slope"] is not None and slope > params["thresh_slope"]:
         return None,None
     isok = np.abs(track-strack)
@@ -417,7 +419,6 @@ class DetectOrthodromyWithBeacons(Detect):
         model="quantile",
         timesplit=3600.,
         thresh_iou = 0.9,
-        thresh_border = 0.1,
     )
     @classmethod
     def add_parser(cls,parser):
@@ -432,6 +433,7 @@ class DetectOrthodromyWithBeacons(Detect):
         super().__init__()
         self.params = {**self.default, **kwargs}
         self.params["thresh_slope"]=None
+        self.params["thresh_border"] = None
         self.fpdatabase=fpdatabase
     def extract_segments(self,df):
         flightplan = self.fpdatabase.extract_flightplan(df)#self.extract_flightplan(self.flightplans,df)
@@ -566,8 +568,9 @@ def test_one(cls,prefix):
         nf["duration [s]"]=nf["stop"]-nf["start"]
         if args.folderfigures is not None:
             with open(f"{args.folderfigures}/table{prefix}.tex",'w') as f:
-                f.write(nf[["identified","pure","segment number","duration [s]","ortho-loxo [m]","adsb-loxo [m]","ortho-adsb [m]"]].to_latex(index=False,float_format="%.2f"))
-        nf[["identified","pure","maxloxo","maxortho","segment number","start","stop"]].to_csv("segments_longest.csv",index=False)
+                tf = nf.query("pure")
+                f.write(tf[["identified","segment number","duration [s]","ortho-loxo [m]","adsb-loxo [m]","ortho-adsb [m]"]].to_latex(index=False,float_format="%.2f"))
+        nf[["identified","pure","maxloxo","maxortho","segment number","start","stop"]].to_csv(f"{args.folderfigures}/withpure{args.identifiedcsv}",index=False)
 
 if __name__ == '__main__':
     test_one(DetectOrthodromyWithBeacons,"classic")

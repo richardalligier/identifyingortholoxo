@@ -1,4 +1,4 @@
 FOLDER = outfiles
 FOLDER_DETECTEDREF_JSON = smallpartofthecataloguejusttoreproducethefigures/json/2207
-FOLDER_FIGURES= newfigures
+FOLDER_FIGURES_PREFIX = figures
 #outfiles/disk2/reproducejson
